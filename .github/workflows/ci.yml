@@ -32,6 +32,8 @@ jobs:
         with:
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
 
+      - name: Make gradlew executable
+        run: chmod +x gradlew
       - name: Run Unit & JVM Tests
         run: ./gradlew testDebugUnitTest --continue
 
