@@ -200,7 +200,7 @@ object ProceduralGenerator {
                 directions[random.nextInt(directions.size)]
             }
 
-            val headCandidate = pickClearHead(gridWidth, gridHeight, exitDir, occupiedCells, random)
+            val headCandidate = pickClearHead(city, gridWidth, gridHeight, exitDir, occupiedCells, random)
                 ?: continue
 
             val waypoints = buildBackwardPathWithCityStyle(
@@ -234,6 +234,7 @@ object ProceduralGenerator {
     }
 
     private fun pickClearHead(
+        city: CityConfig,
         gridWidth: Int,
         gridHeight: Int,
         exitDir: Direction,
@@ -317,7 +318,28 @@ object ProceduralGenerator {
             } else {
                 listOf(Direction.UP, Direction.DOWN)
             }
-            val turnDir = turnDirs[random.nextInt(turnDirs.size)]
+            
+            var turnDir = turnDirs[random.nextInt(turnDirs.size)]
+            
+            // Illusion preference: actively steer towards existing structures to trace them
+            if (city.illusionPreference > 0f && random.nextFloat() < city.illusionPreference) {
+                var bestDir = turnDir
+                var maxAdj = -1
+                for (dir in turnDirs) {
+                    val testPt = current.plus(dir)
+                    if (testPt.x in 1 until gridWidth - 1 && testPt.y in 1 until gridHeight - 1 && testPt !in localOccupied) {
+                        val adjCount = listOf(Direction.UP, Direction.DOWN, Direction.LEFT, Direction.RIGHT)
+                            .count { testPt.plus(it) in occupiedCells }
+                        if (adjCount > maxAdj) {
+                            maxAdj = adjCount
+                            bestDir = dir
+                        }
+                    }
+                }
+                if (maxAdj >= 0) {
+                    turnDir = bestDir
+                }
+            }
 
             val segLen = if (city.longSweepPreference > 0f) {
                 2 + random.nextInt(4)

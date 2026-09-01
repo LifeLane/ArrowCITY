@@ -18,7 +18,9 @@ data class CityConfig(
     val maxTurnsRange: IntRange,
     val symmetryPreference: Float = 0f, // 0.0 to 1.0
     val verticalPreference: Float = 0f, // 0.0 to 1.0
-    val longSweepPreference: Float = 0f  // 0.0 to 1.0
+    val longSweepPreference: Float = 0f,  // 0.0 to 1.0
+    val illusionPreference: Float = 0f, // 0.0 to 1.0 for visual illusions
+    val densityPreference: Float = 0f // 0.0 to 1.0
 ) {
     val totalRoutes: Int get() = endLevel - startLevel + 1
 }
@@ -38,7 +40,9 @@ object CityRepository {
             gridHeightRange = 8..10,
             arrowCountRange = 4..8,
             maxTurnsRange = 1..2,
-            symmetryPreference = 0.2f
+            symmetryPreference = 0.2f,
+            illusionPreference = 0.5f,
+            densityPreference = 0.4f
         ),
         CityConfig(
             id = 2,
@@ -53,7 +57,9 @@ object CityRepository {
             gridHeightRange = 10..12,
             arrowCountRange = 7..11,
             maxTurnsRange = 1..2,
-            longSweepPreference = 0.7f
+            longSweepPreference = 0.7f,
+            illusionPreference = 0.8f,
+            densityPreference = 0.6f
         ),
         CityConfig(
             id = 3,
