@@ -115,6 +115,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun loadPersistedState() {
+        val currentLvl = prefs.getInt("current_level", 1)
         val highest = prefs.getInt("highest_level", 1)
         val movementSound = prefs.getBoolean("movement_sound_enabled", prefs.getBoolean("sound_enabled", true))
         val ambientSound = prefs.getBoolean("ambient_nature_enabled", true)
@@ -123,6 +124,13 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         val themeId = prefs.getString("selected_theme", GameThemes.EyeComfort.id)
 
         val theme = GameThemes.allThemes.find { it.id == themeId } ?: GameThemes.EyeComfort
+
+        // Load all saved star ratings for completed levels
+        val starsMap = mutableMapOf<Int, Int>()
+        for (lvl in 1..highest) {
+            val s = prefs.getInt("stars_lvl_$lvl", 0)
+            if (s > 0) starsMap[lvl] = s
+        }
 
         soundManager.isMovementSoundEnabled = movementSound
         soundManager.isAmbientNatureEnabled = ambientSound
@@ -134,7 +142,9 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
 
         _uiState.update {
             it.copy(
-                highestUnlockedLevel = highest,
+                currentLevelNumber = currentLvl,
+                highestUnlockedLevel = maxOf(highest, currentLvl),
+                completedLevelsStars = starsMap,
                 soundEnabled = movementSound,
                 movementSoundEnabled = movementSound,
                 ambientNatureEnabled = ambientSound,
@@ -145,15 +155,115 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun loadLevel(levelNumber: Int) {
-        val level = LevelRepository.getLevel(levelNumber)
-        levelStartTime = System.currentTimeMillis()
+    /**
+     * Checks whether a specific level number is unlocked.
+     */
+    fun isLevelUnlocked(levelNumber: Int): Boolean {
+        return levelNumber <= _uiState.value.highestUnlockedLevel
+    }
+
+    /**
+     * Unlocks subsequent puzzles up to the target level number and persists the unlocked state.
+     */
+    fun unlockLevel(levelNumber: Int) {
+        val newHighest = maxOf(_uiState.value.highestUnlockedLevel, levelNumber)
+        prefs.edit().putInt("highest_level", newHighest).apply()
+        _uiState.update { it.copy(highestUnlockedLevel = newHighest) }
+    }
+
+    /**
+     * Unlocks the immediate next puzzle.
+     */
+    fun unlockNextLevel() {
+        val nextLevel = _uiState.value.currentLevelNumber + 1
+        unlockLevel(nextLevel)
+    }
+
+    /**
+     * Resets all progress back to Level 1.
+     */
+    fun resetLevelProgress() {
+        prefs.edit()
+            .putInt("current_level", 1)
+            .putInt("highest_level", 1)
+            .apply()
+        _uiState.update {
+            it.copy(
+                highestUnlockedLevel = 1,
+                completedLevelsStars = emptyMap()
+            )
+        }
+        loadLevel(1)
+    }
+
+    /**
+     * Resets the entire grid state and interactive mechanics for the current level.
+     */
+    fun resetGridState() {
         collisionResetJob?.cancel()
         hintResetJob?.cancel()
         comboResetJob?.cancel()
         comboRewardResetJob?.cancel()
 
-        // Ensure free available power-ups for every level (always at least 3 snips, 3 ghosts, 2 magnets, 3 recalls)
+        val state = _uiState.value
+        val freshLevel = LevelRepository.getLevel(state.currentLevelNumber)
+
+        // Ensure baseline power-up reserves for every puzzle
+        val currentPowers = state.powerUpsRemaining
+        val guaranteedPowers = mapOf(
+            PowerUpType.SNIP to maxOf(currentPowers[PowerUpType.SNIP] ?: 0, 3),
+            PowerUpType.GHOST to maxOf(currentPowers[PowerUpType.GHOST] ?: 0, 3),
+            PowerUpType.MAGNET to maxOf(currentPowers[PowerUpType.MAGNET] ?: 0, 2),
+            PowerUpType.RECALL to maxOf(currentPowers[PowerUpType.RECALL] ?: 0, 3)
+        )
+
+        _uiState.update {
+            it.copy(
+                levelData = freshLevel,
+                activeArrows = freshLevel.arrows,
+                flyingArrows = emptyList(),
+                remainingDrops = freshLevel.maxDrops,
+                maxDrops = freshLevel.maxDrops,
+                movesCount = 0,
+                hintArrowId = null,
+                guidanceArrowId = null,
+                collisionInfo = null,
+                isLevelCompleted = false,
+                isLevelFailed = false,
+                comboMultiplier = 1,
+                showComboBanner = false,
+                comboReward = null,
+                activePowerUp = null,
+                powerUpsRemaining = guaranteedPowers,
+                impactSparks = emptyList(),
+                softDustParticles = emptyList(),
+                shockwaves = emptyList(),
+                moveHistory = emptyList()
+            )
+        }
+    }
+
+    /**
+     * Loads a specific level, unlocks it if accessed, resets the grid state, and persists the active level.
+     */
+    fun loadLevel(levelNumber: Int) {
+        val safeLevel = maxOf(1, levelNumber)
+        val level = LevelRepository.getLevel(safeLevel)
+        levelStartTime = System.currentTimeMillis()
+
+        // Track and persist the current level
+        prefs.edit().putInt("current_level", safeLevel).apply()
+
+        // Auto-unlock the level if navigated to
+        if (safeLevel > _uiState.value.highestUnlockedLevel) {
+            unlockLevel(safeLevel)
+        }
+
+        collisionResetJob?.cancel()
+        hintResetJob?.cancel()
+        comboResetJob?.cancel()
+        comboRewardResetJob?.cancel()
+
         val currentPowers = _uiState.value.powerUpsRemaining
         val guaranteedPowers = mapOf(
             PowerUpType.SNIP to maxOf(currentPowers[PowerUpType.SNIP] ?: 0, 3),
@@ -164,7 +274,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
 
         _uiState.update {
             it.copy(
-                currentLevelNumber = levelNumber,
+                currentLevelNumber = safeLevel,
                 levelData = level,
                 activeArrows = level.arrows,
                 flyingArrows = emptyList(),
@@ -190,12 +300,19 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    /**
+     * Restarts the current level with a clean grid reset.
+     */
     fun restartCurrentLevel() {
         loadLevel(_uiState.value.currentLevelNumber)
     }
 
+    /**
+     * Advances to and unlocks the next subsequent puzzle, resetting the grid state.
+     */
     fun nextLevel() {
         val next = _uiState.value.currentLevelNumber + 1
+        unlockLevel(next)
         loadLevel(next)
     }
 
