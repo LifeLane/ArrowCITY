@@ -46,7 +46,7 @@ jobs:
           KEY_ALIAS: ${{ secrets.KEY_ALIAS || 'upload' }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD || 'android' }}
         run: |
-          ./gradlew bundleRelease assembleRelease --stacktrace
+          ./gradlew clean bundleRelease assembleRelease --stacktrace
 
       - name: Upload Release AAB (Google Play Beta)
         uses: actions/upload-artifact@v4

@@ -31,10 +31,26 @@ object ProceduralGenerator {
             }
         }
 
-        val arrows = if (silhouetteMask != null) {
-            generateMaskedArrowSet(silhouetteMask, random)
-        } else {
-            generateSolvableArrowSet(width, height, targetArrows, random)
+        var arrows: List<ArrowItem> = emptyList()
+        var attempts = 0
+
+        while (attempts < 6) {
+            val iterRandom = Random(levelNumber.toLong() * 31337L + 7919L + attempts * 10007L)
+            val candidateArrows = if (silhouetteMask != null && attempts < 2) {
+                generateMaskedArrowSet(silhouetteMask, iterRandom)
+            } else {
+                generateSolvableArrowSet(width, height, targetArrows, iterRandom)
+            }
+
+            if (candidateArrows.isNotEmpty() && validateArrowSet(candidateArrows, width, height)) {
+                arrows = candidateArrows
+                break
+            }
+            attempts++
+        }
+
+        if (arrows.isEmpty() || !validateArrowSet(arrows, width, height)) {
+            arrows = generateDeterministicFallback(levelNumber, width, height, targetArrows)
         }
 
         val bannerWords = listOf(
@@ -259,6 +275,121 @@ object ProceduralGenerator {
                     ".....XXXXX.....",
                     "......XXX......",
                     ".......X......."
+                )
+            )
+            90 -> SilhouetteConfig(
+                title = "Origami Swan 🦢",
+                icon = "🦢",
+                width = 15,
+                height = 14,
+                targetArrows = 20,
+                banner = "ORIGAMI SWAN",
+                maskPattern = listOf(
+                    ".......XX......",
+                    "......XXXX.....",
+                    ".....XX..XX....",
+                    "....XX....X....",
+                    "...XX..........",
+                    "..XXXXXXXXXXX..",
+                    ".XXXXXXXXXXXXX.",
+                    "XXXXXXXXXXXXXXX",
+                    ".XXXXXXXXXXXX..",
+                    "..XXXXXXXXXX...",
+                    "...XXXXXXXX...."
+                )
+            )
+            180 -> SilhouetteConfig(
+                title = "Crescent Moon 🌙",
+                icon = "🌙",
+                width = 15,
+                height = 15,
+                targetArrows = 22,
+                banner = "CRESCENT MOON",
+                maskPattern = listOf(
+                    ".....XXXXX.....",
+                    "...XXXXXXXX....",
+                    "..XXXXX........",
+                    ".XXXXX.........",
+                    "XXXXX..........",
+                    "XXXXX..........",
+                    "XXXXX..........",
+                    "XXXXX..........",
+                    ".XXXXX.........",
+                    "..XXXXX........",
+                    "...XXXXXXXX....",
+                    ".....XXXXX....."
+                )
+            )
+            250 -> SilhouetteConfig(
+                title = "Phoenix Ascending 🔥",
+                icon = "🔥",
+                width = 16,
+                height = 16,
+                targetArrows = 26,
+                banner = "PHOENIX ASCENT",
+                maskPattern = listOf(
+                    ".......XX.......",
+                    "......XXXX......",
+                    "X....XXXXXX....X",
+                    "XX..XXXXXXXX..XX",
+                    "XXX.XXXXXXXX.XXX",
+                    "XXXXXXXXXXXXXXXX",
+                    ".XXXXXXXXXXXXXX.",
+                    "..XXXXXXXXXXXX..",
+                    "...XXXXXXXXXX...",
+                    "....XXXXXXXX....",
+                    ".....XXXXXX.....",
+                    "......XXXX......",
+                    ".......XX.......",
+                    "......XXXX......",
+                    ".....XX..XX....."
+                )
+            )
+            300 -> SilhouetteConfig(
+                title = "Mythic Dragon 🐉",
+                icon = "🐉",
+                width = 16,
+                height = 16,
+                targetArrows = 28,
+                banner = "MYTHIC DRAGON",
+                maskPattern = listOf(
+                    "...XXXXX........",
+                    "..XXXXXXX.......",
+                    ".XXXXXXXX.......",
+                    "...XXXXXXX......",
+                    "....XXXXXXXX....",
+                    ".....XXXXXXXX...",
+                    "......XXXXXXXX..",
+                    "..XX...XXXXXXXX.",
+                    ".XXXX...XXXXXXXX",
+                    "XXXXX....XXXXXXX",
+                    ".XXXXX....XXXXX.",
+                    "..XXXXX...XXXX..",
+                    "...XXXXXXXXXXX..",
+                    "....XXXXXXXXX...",
+                    ".....XXXXXXX...."
+                )
+            )
+            500 -> SilhouetteConfig(
+                title = "Celestial Castle 🏰",
+                icon = "🏰",
+                width = 16,
+                height = 16,
+                targetArrows = 30,
+                banner = "STAR CITADEL",
+                maskPattern = listOf(
+                    "X..X..XXXX..X..X",
+                    "X..X..XXXX..X..X",
+                    "XXXX..XXXX..XXXX",
+                    "XXXXXXXXXXXXXXXX",
+                    "XXXXXXXXXXXXXXXX",
+                    ".XXXXXXXXXXXXXX.",
+                    ".XXXXXXXXXXXXXX.",
+                    "XXXXXXXXXXXXXXXX",
+                    "XXXXXX....XXXXXX",
+                    "XXXXXX....XXXXXX",
+                    "XXXXXXXXXXXXXXXX",
+                    "XXXXXXXXXXXXXXXX"
                 )
             )
             else -> null
@@ -565,6 +696,88 @@ object ProceduralGenerator {
         }
 
         return pathWaypoints
+    }
+
+    /**
+     * Validates that all arrows have valid orthogonal geometry, lie strictly within board bounds,
+     * do not overlap each other in the initial layout, and that the puzzle is 100% solvable.
+     */
+    fun validateArrowSet(arrows: List<ArrowItem>, gridWidth: Int, gridHeight: Int): Boolean {
+        if (arrows.isEmpty()) return false
+        val allOccupied = mutableSetOf<GridPoint>()
+
+        for (arrow in arrows) {
+            if (arrow.points.size < 2) return false
+
+            // Verify orthogonal connectivity
+            for (i in 0 until arrow.points.size - 1) {
+                val p1 = arrow.points[i]
+                val p2 = arrow.points[i + 1]
+                if (p1.x != p2.x && p1.y != p2.y) return false
+                if (p1 == p2) return false
+            }
+
+            val cells = arrow.allOccupiedCells()
+            if (cells.isEmpty()) return false
+
+            // Verify bounds and non-overlapping condition
+            for (cell in cells) {
+                if (cell.x < 0 || cell.x >= gridWidth || cell.y < 0 || cell.y >= gridHeight) {
+                    return false
+                }
+                if (cell in allOccupied) {
+                    return false
+                }
+                allOccupied.add(cell)
+            }
+        }
+
+        return PuzzleSolver.isSolvable(arrows, gridWidth, gridHeight)
+    }
+
+    /**
+     * Produces a guaranteed geometrically valid and solvable deterministic fallback puzzle.
+     */
+    fun generateDeterministicFallback(
+        levelNumber: Int,
+        gridWidth: Int,
+        gridHeight: Int,
+        targetCount: Int
+    ): List<ArrowItem> {
+        val arrows = mutableListOf<ArrowItem>()
+        val count = targetCount.coerceIn(3, (gridHeight / 2).coerceAtLeast(3))
+        var id = 1
+
+        for (i in 0 until count) {
+            val y = 1 + (i * 2)
+            if (y >= gridHeight - 1) break
+            val isEven = i % 2 == 0
+            val startX = if (isEven) 1 else gridWidth - 2
+            val endX = if (isEven) gridWidth - 2 else 1
+            val dir = if (isEven) Direction.RIGHT else Direction.LEFT
+
+            arrows.add(
+                ArrowItem(
+                    id = id++,
+                    points = listOf(GridPoint(startX, y), GridPoint(endX, y)),
+                    headDirection = dir,
+                    colorIndex = (id - 1) % 4
+                )
+            )
+        }
+
+        if (arrows.isEmpty()) {
+            arrows.add(
+                ArrowItem(
+                    id = 1,
+                    points = listOf(GridPoint(1, 1), GridPoint(gridWidth - 2, 1)),
+                    headDirection = Direction.RIGHT,
+                    colorIndex = 0
+                )
+            )
+        }
+
+        return arrows
     }
 }
 
