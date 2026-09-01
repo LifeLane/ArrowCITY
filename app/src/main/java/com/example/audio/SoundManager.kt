@@ -26,9 +26,15 @@ class SoundManager(private val context: Context) {
     private val scope = CoroutineScope(Dispatchers.Default)
     private val random = Random()
 
+    val haptics = HapticFeedbackService(context)
+
     var isMovementSoundEnabled: Boolean = true
     var isAmbientNatureEnabled: Boolean = true
-    var isHapticEnabled: Boolean = true
+    var isHapticEnabled: Boolean
+        get() = haptics.isEnabled
+        set(value) {
+            haptics.isEnabled = value
+        }
 
     // Legacy property compatibility
     var isSoundEnabled: Boolean
@@ -39,16 +45,6 @@ class SoundManager(private val context: Context) {
 
     private var ambientJob: Job? = null
     private var ambientAudioTrack: AudioTrack? = null
-
-    private val vibrator: Vibrator? by lazy {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            val vibratorManager = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
-            vibratorManager?.defaultVibrator
-        } else {
-            @Suppress("DEPRECATION")
-            context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
-        }
-    }
 
     /**
      * Starts the serene ambient nature background sound loop (gentle breeze, harmonic zen drone, soft stream rustle).
@@ -187,7 +183,7 @@ class SoundManager(private val context: Context) {
 
     /** Soft wooden resonant click when touching an arrow */
     fun playTap() {
-        triggerHaptic(HapticType.LIGHT)
+        haptics.onArrowTap()
         playTone(durationSeconds = 0.05) { t, progress ->
             val env = exp(-progress * 25.0)
             val freq = 750.0 - progress * 200.0
@@ -197,7 +193,7 @@ class SoundManager(private val context: Context) {
 
     /** Satisfying gentle air whoosh with subtle rising pitch when arrow clears, scaling with combo */
     fun playWhoosh(combo: Int = 1) {
-        triggerHaptic(HapticType.MEDIUM)
+        haptics.onArrowCleared(combo)
         
         // Pentatonic scale frequencies for combo multiplier (1 to 8)
         val scaleFrequencies = doubleArrayOf(
@@ -224,7 +220,7 @@ class SoundManager(private val context: Context) {
 
     /** Power-up: Zen Snip scissor cut */
     fun playSnip() {
-        triggerHaptic(HapticType.LIGHT)
+        haptics.onPowerUpUsed()
         playTone(durationSeconds = 0.14) { t, progress ->
             val env = exp(-progress * 28.0)
             val noise = (random.nextDouble() * 2.0 - 1.0) * 0.6
@@ -235,7 +231,7 @@ class SoundManager(private val context: Context) {
 
     /** Power-up: Ghost Phase ethereal chime */
     fun playGhostPhase() {
-        triggerHaptic(HapticType.LIGHT)
+        haptics.onPowerUpUsed()
         playTone(durationSeconds = 0.5) { t, progress ->
             val env = exp(-progress * 4.0)
             val f1 = sin(2.0 * PI * 880.0 * t + sin(2.0 * PI * 6.0 * t) * 2.0) * 0.4
@@ -246,7 +242,7 @@ class SoundManager(private val context: Context) {
 
     /** Power-up: Singing bowl harmonic magnet pulse */
     fun playMagnetPulse() {
-        triggerHaptic(HapticType.SUCCESS)
+        haptics.onPowerUpUsed()
         playTone(durationSeconds = 0.7) { t, progress ->
             val env = exp(-progress * 3.0)
             val base = sin(2.0 * PI * 440.0 * t) * 0.4
@@ -258,7 +254,7 @@ class SoundManager(private val context: Context) {
 
     /** Power-up: Flow Recall rewind sound */
     fun playRecall() {
-        triggerHaptic(HapticType.MEDIUM)
+        haptics.onPowerUpUsed()
         playTone(durationSeconds = 0.35) { t, progress ->
             val env = exp(-progress * 5.0)
             // Descending sweep with reverse chirp
@@ -270,7 +266,7 @@ class SoundManager(private val context: Context) {
 
     /** Soft blocked thud when player taps an obstructed arrow */
     fun playBlocked() {
-        triggerHaptic(HapticType.ERROR)
+        haptics.onObstacleBlocked()
         playTone(durationSeconds = 0.18) { t, progress ->
             val env = exp(-progress * 18.0)
             val lowFreq = 160.0 - progress * 40.0
@@ -280,7 +276,7 @@ class SoundManager(private val context: Context) {
 
     /** Gentle crystalline chime for Guidance / Hint */
     fun playHint() {
-        triggerHaptic(HapticType.LIGHT)
+        haptics.onArrowTap()
         playTone(durationSeconds = 0.45) { t, progress ->
             val env = exp(-progress * 6.0)
             val f1 = sin(2.0 * PI * 1046.5 * t) * 0.4 // C6
@@ -292,7 +288,7 @@ class SoundManager(private val context: Context) {
 
     /** Pentatonic calming fanfare chord when level is cleared */
     fun playLevelComplete() {
-        triggerHaptic(HapticType.SUCCESS)
+        haptics.onLevelComplete()
         playTone(durationSeconds = 0.85) { t, progress ->
             val env = exp(-progress * 3.5)
             // Pentatonic scale arpeggio notes (C5, E5, G5, A5, C6)
@@ -307,7 +303,7 @@ class SoundManager(private val context: Context) {
 
     /** Soft gentle drop sound when a life / drop is lost */
     fun playDropLost() {
-        triggerHaptic(HapticType.LIGHT)
+        haptics.onArrowTap()
         playTone(durationSeconds = 0.25) { t, progress ->
             val env = exp(-progress * 12.0)
             val freq = 450.0 - progress * 150.0
@@ -317,29 +313,13 @@ class SoundManager(private val context: Context) {
 
     enum class HapticType { LIGHT, MEDIUM, SUCCESS, ERROR }
 
-    private fun triggerHaptic(type: HapticType) {
+    fun triggerHaptic(type: HapticType) {
         if (!isHapticEnabled) return
-        try {
-            val vib = vibrator ?: return
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                val effect = when (type) {
-                    HapticType.LIGHT -> VibrationEffect.createOneShot(18, VibrationEffect.DEFAULT_AMPLITUDE)
-                    HapticType.MEDIUM -> VibrationEffect.createOneShot(35, VibrationEffect.DEFAULT_AMPLITUDE)
-                    HapticType.SUCCESS -> VibrationEffect.createWaveform(longArrayOf(0, 30, 60, 40), -1)
-                    HapticType.ERROR -> VibrationEffect.createWaveform(longArrayOf(0, 40, 50, 40), -1)
-                }
-                vib.vibrate(effect)
-            } else {
-                @Suppress("DEPRECATION")
-                when (type) {
-                    HapticType.LIGHT -> vib.vibrate(18)
-                    HapticType.MEDIUM -> vib.vibrate(35)
-                    HapticType.SUCCESS -> vib.vibrate(longArrayOf(0, 30, 60, 40), -1)
-                    HapticType.ERROR -> vib.vibrate(longArrayOf(0, 40, 50, 40), -1)
-                }
-            }
-        } catch (e: Exception) {
-            // Ignore haptic failures gracefully
+        when (type) {
+            HapticType.LIGHT -> haptics.onArrowTap()
+            HapticType.MEDIUM -> haptics.onArrowSlideStart()
+            HapticType.SUCCESS -> haptics.onLevelComplete()
+            HapticType.ERROR -> haptics.onObstacleBlocked()
         }
     }
 }

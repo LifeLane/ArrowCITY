@@ -3,25 +3,32 @@ package com.example.ui.components
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -51,10 +58,12 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Tab
+import androidx.compose.material3.TabPosition
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.TabRowDefaults
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
@@ -78,7 +87,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.example.engine.LevelRepository
+import com.example.model.ArrowSkinType
+import com.example.model.BackgroundAnimType
+import com.example.model.BoardCanvasType
 import com.example.model.GameTheme
+import com.example.model.MazeGridStyle
 import com.example.ui.theme.GameThemes
 import com.example.viewmodel.GameUiState
 
@@ -777,41 +790,16 @@ fun SettingsDialog(
 }
 
 @Composable
-fun ZenBreatheDialog(
+fun GameConfirmationDialog(
+    title: String,
+    message: String,
+    confirmButtonText: String,
+    dismissButtonText: String = "Stay in Flow",
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
     theme: GameTheme,
+    onConfirm: () -> Unit,
     onDismiss: () -> Unit
 ) {
-    var phase by remember { androidx.compose.runtime.mutableStateOf("Inhale") }
-    var secondsLeft by remember { androidx.compose.runtime.mutableIntStateOf(4) }
-    var cycleCount by remember { androidx.compose.runtime.mutableIntStateOf(1) }
-
-    androidx.compose.runtime.LaunchedEffect(Unit) {
-        val phases = listOf("Inhale", "Hold", "Exhale", "Hold")
-        var currentPhaseIndex = 0
-        while (true) {
-            for (sec in 4 downTo 1) {
-                secondsLeft = sec
-                kotlinx.coroutines.delay(1000)
-            }
-            currentPhaseIndex = (currentPhaseIndex + 1) % phases.size
-            phase = phases[currentPhaseIndex]
-            if (currentPhaseIndex == 0) {
-                cycleCount++
-            }
-        }
-    }
-
-    val infiniteTransition = rememberInfiniteTransition(label = "breathe")
-    val breatheScale by infiniteTransition.animateFloat(
-        initialValue = 0.8f,
-        targetValue = 1.25f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(4000, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "breatheScale"
-    )
-
     Dialog(onDismissRequest = onDismiss) {
         Card(
             shape = RoundedCornerShape(24.dp),
@@ -819,8 +807,8 @@ fun ZenBreatheDialog(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp)
-                .shadow(16.dp, RoundedCornerShape(24.dp))
-                .testTag("zen_breathe_dialog")
+                .shadow(18.dp, RoundedCornerShape(24.dp))
+                .testTag("game_confirmation_dialog")
         ) {
             Column(
                 modifier = Modifier
@@ -828,71 +816,251 @@ fun ZenBreatheDialog(
                     .padding(24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Text(
-                    text = "Mindful Box Breathing",
-                    fontSize = 22.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = theme.headerGold
-                )
-
-                Spacer(modifier = Modifier.height(4.dp))
-
-                Text(
-                    text = "Cycle $cycleCount • 4-4-4-4 Rhythm",
-                    fontSize = 13.sp,
-                    color = theme.textSecondary
-                )
-
-                Spacer(modifier = Modifier.height(30.dp))
-
-                // Pulsing Breathing Circle with real-time phase and countdown
                 Box(
                     modifier = Modifier
-                        .size(170.dp)
-                        .scale(if (phase == "Inhale" || phase == "Hold") breatheScale else (2.05f - breatheScale).coerceIn(0.8f, 1.25f))
+                        .size(56.dp)
                         .clip(CircleShape)
-                        .background(
-                            Brush.radialGradient(
-                                listOf(
-                                    theme.dropActiveColor.copy(alpha = 0.75f),
-                                    theme.dropActiveColor.copy(alpha = 0.12f)
-                                )
-                            )
-                        )
-                        .border(3.dp, theme.dropActiveColor, CircleShape),
+                        .background(theme.headerGold.copy(alpha = 0.15f))
+                        .border(1.5.dp, theme.headerGold.copy(alpha = 0.5f), CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(
-                            text = phase,
-                            fontSize = 22.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = Color.White
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = "${secondsLeft}s",
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White.copy(alpha = 0.9f)
-                        )
-                    }
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = theme.headerGold,
+                        modifier = Modifier.size(28.dp)
+                    )
                 }
 
-                Spacer(modifier = Modifier.height(34.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
                 Text(
-                    text = when (phase) {
-                        "Inhale" -> "Breathe in deeply through the nose..."
-                        "Exhale" -> "Release tension out through the mouth..."
-                        else -> "Hold gently and let your mind settle..."
-                    },
-                    fontSize = 13.sp,
-                    color = theme.textSecondary,
+                    text = title,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = theme.textPrimary,
                     textAlign = TextAlign.Center
                 )
 
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Text(
+                    text = message,
+                    fontSize = 13.sp,
+                    color = theme.textSecondary,
+                    textAlign = TextAlign.Center,
+                    lineHeight = 19.sp
+                )
+
                 Spacer(modifier = Modifier.height(24.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = onDismiss,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(46.dp)
+                            .testTag("confirm_dialog_dismiss"),
+                        shape = RoundedCornerShape(14.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, theme.bannerBorder)
+                    ) {
+                        Text(
+                            text = dismissButtonText,
+                            color = theme.textPrimary,
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 13.sp
+                        )
+                    }
+
+                    Button(
+                        onClick = onConfirm,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(46.dp)
+                            .testTag("confirm_dialog_confirm"),
+                        colors = ButtonDefaults.buttonColors(containerColor = theme.headerGold),
+                        shape = RoundedCornerShape(14.dp)
+                    ) {
+                        Text(
+                            text = confirmButtonText,
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun ZenBreatheDialog(
+    theme: GameTheme,
+    onDismiss: () -> Unit
+) {
+    var phaseIndex by remember { androidx.compose.runtime.mutableIntStateOf(0) }
+    var secondsLeft by remember { androidx.compose.runtime.mutableIntStateOf(4) }
+    var cycleCount by remember { androidx.compose.runtime.mutableIntStateOf(1) }
+
+    val phases = listOf("Inhale", "Hold", "Exhale", "Rest")
+    val phase = phases[phaseIndex % phases.size]
+
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        while (true) {
+            for (sec in 4 downTo 1) {
+                secondsLeft = sec
+                kotlinx.coroutines.delay(1000)
+            }
+            phaseIndex = (phaseIndex + 1) % phases.size
+            if (phaseIndex == 0) {
+                cycleCount++
+            }
+        }
+    }
+
+    val infiniteTransition = rememberInfiniteTransition(label = "breathe")
+    val breatheScale by infiniteTransition.animateFloat(
+        initialValue = 0.85f,
+        targetValue = 1.30f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(4000, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "breatheScale"
+    )
+
+    val currentScale = when (phase) {
+        "Inhale" -> 0.85f + (4 - secondsLeft) * 0.11f
+        "Hold" -> 1.30f
+        "Exhale" -> 1.30f - (4 - secondsLeft) * 0.11f
+        else -> 0.85f // Rest
+    }
+
+    val animatedScale by animateFloatAsState(
+        targetValue = currentScale,
+        animationSpec = tween(900, easing = FastOutSlowInEasing),
+        label = "smoothBreatheScale"
+    )
+
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            shape = RoundedCornerShape(26.dp),
+            colors = CardDefaults.cardColors(containerColor = theme.cardBg),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(14.dp)
+                .shadow(20.dp, RoundedCornerShape(26.dp))
+                .testTag("zen_breathe_dialog")
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(22.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(
+                            text = "Zen Pranayama Breathing",
+                            fontSize = 19.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = theme.headerGold
+                        )
+                        Text(
+                            text = "4-4-4-4 Box Breath • Cycle $cycleCount",
+                            fontSize = 12.sp,
+                            color = theme.textSecondary
+                        )
+                    }
+                    IconButton(onClick = onDismiss) {
+                        Icon(Icons.Outlined.Close, contentDescription = "Close", tint = theme.textSecondary)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(28.dp))
+
+                // Expanding and Contracting Visual Breathing Circle
+                Box(
+                    modifier = Modifier
+                        .size(190.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    // Outer aura ring
+                    Box(
+                        modifier = Modifier
+                            .size(175.dp)
+                            .scale(animatedScale * 1.15f)
+                            .clip(CircleShape)
+                            .background(theme.dropActiveColor.copy(alpha = 0.14f))
+                    )
+
+                    // Core expanding breathing sphere
+                    Box(
+                        modifier = Modifier
+                            .size(145.dp)
+                            .scale(animatedScale)
+                            .clip(CircleShape)
+                            .background(
+                                Brush.radialGradient(
+                                    listOf(
+                                        theme.dropActiveColor.copy(alpha = 0.85f),
+                                        theme.dropActiveColor.copy(alpha = 0.35f),
+                                        theme.headerGold.copy(alpha = 0.20f)
+                                    )
+                                )
+                            )
+                            .border(3.dp, theme.dropActiveColor, CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                text = phase,
+                                fontSize = 20.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = Color.White
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = "${secondsLeft}s",
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White.copy(alpha = 0.95f)
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(28.dp))
+
+                // Phase Affirmation Guidance
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = theme.boardBackground,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = when (phase) {
+                            "Inhale" -> "Inhale calm clarity through your nose..."
+                            "Hold" -> "Hold gently, resting in peaceful stillness..."
+                            "Exhale" -> "Exhale tension and release every worry..."
+                            else -> "Rest softly before the next mindful breath..."
+                        },
+                        fontSize = 13.sp,
+                        color = theme.textPrimary,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
 
                 Button(
                     onClick = onDismiss,
@@ -900,9 +1068,9 @@ fun ZenBreatheDialog(
                     shape = RoundedCornerShape(14.dp),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(48.dp)
+                        .height(46.dp)
                 ) {
-                    Text("Return to Puzzle", color = Color.White, fontWeight = FontWeight.Bold)
+                    Text("Resume Flow", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                 }
             }
         }
@@ -1199,10 +1367,15 @@ fun CosmeticStoreDialog(
     uiState: GameUiState,
     onSelectTheme: (GameTheme) -> Unit,
     onSelectTrail: (String) -> Unit,
+    onEquipArrowSkin: (ArrowSkinType) -> Unit,
+    onEquipBoardCanvas: (BoardCanvasType) -> Unit,
+    onEquipGridStyle: (MazeGridStyle) -> Unit,
+    onEquipBgAnim: (BackgroundAnimType) -> Unit,
     onDismiss: () -> Unit
 ) {
     val theme = uiState.selectedTheme
     var selectedTab by remember { mutableIntStateOf(0) }
+    val tabs = listOf("Arrow Skins", "Board Style", "Maze Grids", "Background FX")
 
     Dialog(onDismissRequest = onDismiss) {
         Card(
@@ -1210,35 +1383,35 @@ fun CosmeticStoreDialog(
             colors = CardDefaults.cardColors(containerColor = theme.cardBg),
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(12.dp)
-                .shadow(16.dp, RoundedCornerShape(24.dp))
+                .fillMaxHeight(0.88f)
+                .padding(8.dp)
+                .shadow(20.dp, RoundedCornerShape(24.dp))
                 .testTag("cosmetic_store_dialog")
         ) {
             Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(20.dp),
+                    .fillMaxSize()
+                    .padding(18.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
+                // Header
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
+                    Column {
                         Text(
-                            text = "Arrow City Studio",
-                            fontSize = 22.sp,
-                            fontWeight = FontWeight.Bold,
+                            text = "Cosmetic Boutique",
+                            fontSize = 21.sp,
+                            fontWeight = FontWeight.ExtraBold,
                             color = theme.headerGold
                         )
                         Text(
-                            text = "🎁 Early Access Reward: All 100% Free",
+                            text = "✨ Modular customizations on top of active theme",
                             fontSize = 11.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = theme.dropActiveColor
+                            fontWeight = FontWeight.Medium,
+                            color = theme.textSecondary
                         )
                     }
                     IconButton(onClick = onDismiss) {
@@ -1246,13 +1419,13 @@ fun CosmeticStoreDialog(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(10.dp))
+                Spacer(modifier = Modifier.height(8.dp))
 
                 TabRow(
                     selectedTabIndex = selectedTab,
                     containerColor = Color.Transparent,
                     contentColor = theme.headerGold,
-                    indicator = { tabPositions ->
+                    indicator = { tabPositions: List<TabPosition> ->
                         TabRowDefaults.SecondaryIndicator(
                             modifier = Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
                             color = theme.headerGold
@@ -1262,105 +1435,95 @@ fun CosmeticStoreDialog(
                     Tab(
                         selected = selectedTab == 0,
                         onClick = { selectedTab = 0 },
-                        text = { Text("Color Themes", fontWeight = FontWeight.SemiBold) }
+                        text = { Text("Arrows", fontWeight = FontWeight.Bold, fontSize = 12.sp) }
                     )
                     Tab(
                         selected = selectedTab == 1,
                         onClick = { selectedTab = 1 },
-                        text = { Text("Particle Trails", fontWeight = FontWeight.SemiBold) }
+                        text = { Text("Boards", fontWeight = FontWeight.Bold, fontSize = 12.sp) }
+                    )
+                    Tab(
+                        selected = selectedTab == 2,
+                        onClick = { selectedTab = 2 },
+                        text = { Text("Mazes", fontWeight = FontWeight.Bold, fontSize = 12.sp) }
+                    )
+                    Tab(
+                        selected = selectedTab == 3,
+                        onClick = { selectedTab = 3 },
+                        text = { Text("Atmosphere", fontWeight = FontWeight.Bold, fontSize = 12.sp) }
                     )
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
-                if (selectedTab == 0) {
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        GameThemes.allThemes.forEach { th ->
-                            val isSelected = th.id == uiState.selectedTheme.id
-                            Surface(
-                                shape = RoundedCornerShape(12.dp),
-                                color = if (isSelected) theme.bannerBg else theme.boardBackground,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable { onSelectTheme(th) }
-                            ) {
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(horizontal = 14.dp, vertical = 10.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                                    ) {
-                                        Box(
-                                            modifier = Modifier
-                                                .size(24.dp)
-                                                .clip(CircleShape)
-                                                .background(th.arrowStroke)
-                                                .border(2.dp, th.boardBackground, CircleShape)
-                                        )
-                                        Column {
-                                            Text(th.displayName, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = theme.textPrimary)
-                                            Text(if (th.isDark) "Night Mode" else "Warm Light", fontSize = 11.sp, color = theme.textSecondary)
-                                        }
-                                    }
-
-                                    if (isSelected) {
-                                        Icon(Icons.Outlined.Check, contentDescription = "Active", tint = theme.headerGold)
-                                    }
-                                }
+                // Tab Content List
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    when (selectedTab) {
+                        0 -> { // Arrow Skins
+                            items(ArrowSkinType.entries.size) { idx ->
+                                val skin = ArrowSkinType.entries[idx]
+                                val isEquipped = skin == uiState.equippedArrowSkin
+                                CosmeticItemCard(
+                                    title = skin.displayName,
+                                    subtitle = skin.description,
+                                    iconString = skin.icon,
+                                    isEquipped = isEquipped,
+                                    theme = theme,
+                                    onEquip = { onEquipArrowSkin(skin) }
+                                )
                             }
                         }
-                    }
-                } else {
-                    val trails = listOf(
-                        Triple("stardust", "Stardust Flow", "Soft crystalline shimmer trail"),
-                        Triple("sakura", "Zen Sakura", "Floating meditative flower petals"),
-                        Triple("cosmic_fire", "Cosmic Plasma", "Electric futuristic particle burst"),
-                        Triple("hydro", "Hydro Ripples", "Calming aquatic water ripples")
-                    )
-
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        trails.forEach { (id, name, desc) ->
-                            val isSelected = id == uiState.selectedParticleTrail
-                            Surface(
-                                shape = RoundedCornerShape(12.dp),
-                                color = if (isSelected) theme.bannerBg else theme.boardBackground,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable { onSelectTrail(id) }
-                            ) {
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(horizontal = 14.dp, vertical = 10.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Column {
-                                        Text(name, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = theme.textPrimary)
-                                        Text(desc, fontSize = 11.sp, color = theme.textSecondary)
-                                    }
-
-                                    if (isSelected) {
-                                        Icon(Icons.Outlined.Check, contentDescription = "Equipped", tint = theme.headerGold)
-                                    }
-                                }
+                        1 -> { // Board Canvases
+                            items(BoardCanvasType.entries.size) { idx ->
+                                val canvas = BoardCanvasType.entries[idx]
+                                val isEquipped = canvas == uiState.equippedBoardCanvas
+                                CosmeticItemCard(
+                                    title = canvas.displayName,
+                                    subtitle = canvas.description,
+                                    iconString = canvas.icon,
+                                    isEquipped = isEquipped,
+                                    theme = theme,
+                                    onEquip = { onEquipBoardCanvas(canvas) }
+                                )
+                            }
+                        }
+                        2 -> { // Maze Grids
+                            items(MazeGridStyle.entries.size) { idx ->
+                                val grid = MazeGridStyle.entries[idx]
+                                val isEquipped = grid == uiState.equippedGridStyle
+                                CosmeticItemCard(
+                                    title = grid.displayName,
+                                    subtitle = grid.description,
+                                    iconString = grid.icon,
+                                    isEquipped = isEquipped,
+                                    theme = theme,
+                                    onEquip = { onEquipGridStyle(grid) }
+                                )
+                            }
+                        }
+                        3 -> { // Background FX & Animations
+                            items(BackgroundAnimType.entries.size) { idx ->
+                                val anim = BackgroundAnimType.entries[idx]
+                                val isEquipped = anim == uiState.equippedBackgroundAnim
+                                CosmeticItemCard(
+                                    title = anim.displayName,
+                                    subtitle = anim.description,
+                                    iconString = anim.icon,
+                                    isEquipped = isEquipped,
+                                    theme = theme,
+                                    onEquip = { onEquipBgAnim(anim) }
+                                )
                             }
                         }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(20.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
                 Button(
                     onClick = onDismiss,
@@ -1369,8 +1532,98 @@ fun CosmeticStoreDialog(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(48.dp)
+                        .testTag("cosmetic_done_button")
                 ) {
-                    Text("Done", color = Color.White, fontWeight = FontWeight.Bold)
+                    Text("Apply & Return", color = Color.White, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CosmeticItemCard(
+    title: String,
+    subtitle: String,
+    iconString: String,
+    isEquipped: Boolean,
+    theme: GameTheme,
+    onEquip: () -> Unit
+) {
+    Surface(
+        shape = RoundedCornerShape(14.dp),
+        color = if (isEquipped) theme.bannerBg else theme.boardBackground,
+        border = BorderStroke(
+            width = if (isEquipped) 2.dp else 1.dp,
+            color = if (isEquipped) theme.headerGold else theme.bannerBorder.copy(alpha = 0.5f)
+        ),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onEquip() }
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(
+                modifier = Modifier.weight(1f),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(if (isEquipped) theme.headerGold.copy(alpha = 0.2f) else theme.cardBg),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(text = iconString, fontSize = 20.sp)
+                }
+
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = title,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = theme.textPrimary
+                    )
+                    Text(
+                        text = subtitle,
+                        fontSize = 11.sp,
+                        color = theme.textSecondary,
+                        maxLines = 2
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            if (isEquipped) {
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = theme.headerGold,
+                    modifier = Modifier.padding(2.dp)
+                ) {
+                    Text(
+                        text = "EQUIPPED",
+                        color = Color.White,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                    )
+                }
+            } else {
+                OutlinedButton(
+                    onClick = onEquip,
+                    shape = RoundedCornerShape(8.dp),
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = theme.headerGold),
+                    modifier = Modifier.height(32.dp)
+                ) {
+                    Text("Equip", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                 }
             }
         }

@@ -172,5 +172,64 @@ data class GameTheme(
     val bannerText: Color,
     val cardBg: Color,
     val buttonBg: Color,
-    val isDark: Boolean = false
+    val isDark: Boolean = false,
+    val gridLineColor: Color = Color.Unspecified,
+    val pathwayGlowColor: Color = Color.Unspecified,
+    val themeModeType: String = "standard"
 )
+
+enum class ArrowSkinType(
+    val id: String,
+    val displayName: String,
+    val icon: String,
+    val description: String
+) {
+    DEFAULT("default", "Classic Arrow", "🏹", "Standard aerodynamic vector arrowhead"),
+    HYPERDRIVE_PRISM("hyperdrive_prism", "Hyperdrive Prism", "💎", "Prismatic diamond cut crystal arrow with rainbow refraction"),
+    CYBER_DRAGON("cyber_dragon", "Cyber Dragon", "🐉", "Articulated cybernetic dragon chevron with glowing eyes"),
+    STEAMPUNK_BRASS("steampunk_brass", "Steampunk Brass", "⚙️", "Polished clockwork brass arrow with mechanical gear accent"),
+    NANOTECH_KATANA("nanotech_katana", "Nanotech Katana", "🗡️", "Sleek razor-sharp obsidian katana blade pointer"),
+    APOLLO_ROCKET("apollo_rocket", "Apollo Rocket", "🚀", "Retro silver space cruiser with burning propulsion thrust")
+}
+
+enum class BoardCanvasType(
+    val id: String,
+    val displayName: String,
+    val icon: String,
+    val description: String
+) {
+    DEFAULT("default", "Theme Canvas", "🎨", "Default theme board background and styling"),
+    CARBON_HEXAGON("carbon_hexagon", "Carbon Matrix", "⬡", "High-tech woven carbon fiber with geometric micro-relief"),
+    HOLOGRAPHIC_GLASS("holographic_glass", "Holo Glass", "🪟", "Translucent luminous holographic plate with neon edge bevels"),
+    JAPANESE_TATAMI("japanese_tatami", "Kyoto Tatami", "🎋", "Natural woven rush straw mat with dark embroidered silk border"),
+    RETRO_CRT("retro_crt", "Retro CRT 8-Bit", "📺", "Vintage arcade phosphor monitor with scanlines"),
+    MINIMAL_OLED("minimal_oled", "Pure OLED Void", "⬛", "Absolute deep black obsidian with titanium laser border")
+}
+
+enum class MazeGridStyle(
+    val id: String,
+    val displayName: String,
+    val icon: String,
+    val description: String
+) {
+    DEFAULT("default", "Theme Grid", "📐", "Default theme cell tiles and dots"),
+    CIRCUIT_PCB("circuit_pcb", "Circuit Traces", "🔌", "Printed circuit board copper traces with glowing soldering pads"),
+    CONSTELLATION_NET("constellation_net", "Starry Web", "✨", "Celestial stardust constellation grid with glowing star nodes"),
+    NEON_TUBE("neon_tube", "Neon Gas Tube", "💡", "Glowing cylindrical neon light pipes embedded in grid slots"),
+    SUBWAY_MAP("subway_map", "Transit Metro", "🚇", "Clean urban transit railway route lines with circular junction stations")
+}
+
+enum class BackgroundAnimType(
+    val id: String,
+    val displayName: String,
+    val icon: String,
+    val description: String
+) {
+    DEFAULT("default", "Theme Atmosphere", "🌌", "Default theme animated ambient atmosphere"),
+    MATRIX_STREAM("matrix_stream", "Matrix Stream", "💻", "Cascading digital neon binary code streams"),
+    COSMIC_NEBULA("cosmic_nebula", "Cosmic Nebulae", "🪐", "Deep parallax rotating stellar gas clouds & starfield"),
+    ZEN_SAKURA_DRIFT("zen_sakura_drift", "Sakura Flurry", "🌸", "Floating cherry blossom petals in a spring wind draft"),
+    DEEP_OCEAN_RAYS("deep_ocean_rays", "Abyssal Caustics", "🌊", "Rising underwater air bubbles & sun rays"),
+    MOLTEN_CINDERS("molten_cinders", "Molten Cinders", "🌋", "Rising glowing lava ember sparks and geothermal heat")
+}
+

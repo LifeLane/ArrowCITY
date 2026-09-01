@@ -55,8 +55,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.engine.PuzzleSolver
 import com.example.model.ArrowItem
+import com.example.model.ArrowSkinType
+import com.example.model.BackgroundAnimType
+import com.example.model.BoardCanvasType
 import com.example.model.Direction
 import com.example.model.GameTheme
+import com.example.model.MazeGridStyle
 import com.example.model.PowerUpType
 import com.example.model.SoftDustParticle
 import com.example.viewmodel.FlyingArrow
@@ -114,6 +118,16 @@ fun AmazeGameBoard(
         ),
         label = "ghostShimmer"
     )
+
+    // Staggered entrance animation when a new level starts
+    val entranceProgress = remember(levelData.levelNumber) { Animatable(0f) }
+    LaunchedEffect(levelData.levelNumber) {
+        entranceProgress.snapTo(0f)
+        entranceProgress.animateTo(
+            targetValue = 1f,
+            animationSpec = tween(750, easing = LinearEasing)
+        )
+    }
 
     // Damped harmonic oscillation along direction of collision
     val bounceProgress = remember { Animatable(0f) }
@@ -216,14 +230,25 @@ fun AmazeGameBoard(
 
             val strokeWidth = (cellSize * 0.18f).coerceIn(4f, 11f)
 
-            // Draw rounded cell background tiles and center dots
-            drawTactileGridTiles(
+            // Draw Background Ambient Animations based on Theme or Equipped Store Override
+            drawCustomBackgroundFx(
+                bgAnimType = uiState.equippedBackgroundAnim,
+                theme = theme,
+                pulseAlpha = pulseAlpha,
+                dashPhase = dashPhase
+            )
+
+            // Draw Board Canvas & Maze Grid according to equipped cosmetic overrides
+            drawCustomBoardAndGrid(
                 originX = originX,
                 originY = originY,
                 gridW = gridW,
                 gridH = gridH,
                 cellSize = cellSize,
-                theme = theme
+                theme = theme,
+                boardCanvas = uiState.equippedBoardCanvas,
+                gridStyle = uiState.equippedGridStyle,
+                pulseAlpha = pulseAlpha
             )
 
             // Draw Guidance exit trajectory if active
@@ -248,8 +273,8 @@ fun AmazeGameBoard(
                 }
             }
 
-            // Draw all active arrows with soft drop shadow & state styling
-            for (arrow in activeArrows) {
+            // Draw all active arrows with soft drop shadow, entrance slide, custom skin & state styling
+            activeArrows.forEachIndexed { index, arrow ->
                 val isHinted = arrow.id == hintArrowId
                 val isGuidance = arrow.id == guidanceArrowId
                 val isColliding = collisionInfo?.blockedArrowId == arrow.id
@@ -265,6 +290,23 @@ fun AmazeGameBoard(
                     offsetY = arrow.headDirection.dy * dampFactor
                 }
 
+                // Staggered elastic entrance slide-in from screen edges
+                var entranceOffsetX = 0f
+                var entranceOffsetY = 0f
+                if (entranceProgress.value < 1f) {
+                    val staggerDelay = (index * 0.045f).coerceAtMost(0.40f)
+                    val rawP = ((entranceProgress.value - staggerDelay) / (1f - staggerDelay)).coerceIn(0f, 1f)
+                    if (rawP < 1f) {
+                        val damp = (1f - exp(-rawP * 5.5) * cos(rawP * PI * 3.2)).toFloat().coerceIn(0f, 1.25f)
+                        val inv = 1f - damp
+                        val slideDist = cellSize * 3.5f
+                        val dirX = if (arrow.headDirection.dx != 0) -arrow.headDirection.dx.toFloat() else (if (index % 2 == 0) -1f else 1f)
+                        val dirY = if (arrow.headDirection.dy != 0) -arrow.headDirection.dy.toFloat() else (if (index % 2 == 0) 1f else -1f)
+                        entranceOffsetX = dirX * slideDist * inv
+                        entranceOffsetY = dirY * slideDist * inv
+                    }
+                }
+
                 val strokeColor = when {
                     isColliding -> theme.errorColor
                     isGhostTarget -> Color(0xFFA855F7)
@@ -276,14 +318,15 @@ fun AmazeGameBoard(
 
                 drawArrowItem(
                     arrow = arrow,
-                    originX = originX + offsetX,
-                    originY = originY + offsetY,
+                    originX = originX + offsetX + entranceOffsetX,
+                    originY = originY + offsetY + entranceOffsetY,
                     cellSize = cellSize,
                     strokeWidth = strokeWidth,
                     strokeColor = strokeColor,
                     isHinted = isHinted || isSnipTarget || isGhostTarget,
                     pulseAlpha = if (isGhostTarget) ghostShimmer else pulseAlpha,
-                    theme = theme
+                    theme = theme,
+                    arrowSkin = uiState.equippedArrowSkin
                 )
 
                 // Collision indicator at the blocking point
@@ -447,60 +490,354 @@ fun AmazeGameBoard(
 }
 
 /**
- * Draws rounded cell tiles with center dots matching the board style.
+ * Draws animated background ambient FX based on theme mode or modular Cosmetic Store override.
  */
-private fun DrawScope.drawTactileGridTiles(
-    originX: Float,
-    originY: Float,
-    gridW: Int,
-    gridH: Int,
-    cellSize: Float,
-    theme: GameTheme
+private fun DrawScope.drawCustomBackgroundFx(
+    bgAnimType: BackgroundAnimType,
+    theme: GameTheme,
+    pulseAlpha: Float,
+    dashPhase: Float
 ) {
-    val boardPadding = 8f
-    val boardLeft = originX - boardPadding
-    val boardTop = originY - boardPadding
-    val boardWidth = gridW * cellSize + boardPadding * 2
-    val boardHeight = gridH * cellSize + boardPadding * 2
+    val animToUse = if (bgAnimType != BackgroundAnimType.DEFAULT) {
+        bgAnimType.id
+    } else {
+        when (theme.themeModeType) {
+            "cyber_metropolis" -> "matrix_stream"
+            "midnight_stardust" -> "cosmic_nebula"
+            "sakura_blossom" -> "zen_sakura_drift"
+            "mariana_ocean" -> "deep_ocean_rays"
+            "obsidian_inferno" -> "molten_cinders"
+            else -> "subtle_waves"
+        }
+    }
 
-    // Main board container rounded card
-    drawRoundRect(
-        color = theme.boardBackground,
-        topLeft = Offset(boardLeft, boardTop),
-        size = androidx.compose.ui.geometry.Size(boardWidth, boardHeight),
-        cornerRadius = androidx.compose.ui.geometry.CornerRadius(24f, 24f)
-    )
+    when (animToUse) {
+        "matrix_stream" -> {
+            // Neon vertical digital rain columns
+            val colCount = 14
+            val colSpacing = size.width / colCount
+            for (c in 0 until colCount) {
+                val speed = (c % 5 + 3) * 16f
+                val yOffset = ((dashPhase * speed + c * 85f) % (size.height + 100f)) - 50f
+                val colX = c * colSpacing + colSpacing / 2f
+                val colColor = theme.dropActiveColor.copy(alpha = 0.16f + (c % 3) * 0.05f)
 
-    // Cell tiles
-    val tileInset = cellSize * 0.07f
-    val tileSize = cellSize - tileInset * 2
-    val cellTileColor = if (theme.isDark) Color(0xFF3B2B50).copy(alpha = 0.85f) else theme.cardBg
-    val dotColor = if (theme.isDark) Color(0xFFE879F9).copy(alpha = 0.6f) else theme.textSecondary.copy(alpha = 0.25f)
-
-    for (x in 0 until gridW) {
-        for (y in 0 until gridH) {
-            val cellLeft = originX + x * cellSize + tileInset
-            val cellTop = originY + y * cellSize + tileInset
-
-            drawRoundRect(
-                color = cellTileColor,
-                topLeft = Offset(cellLeft, cellTop),
-                size = androidx.compose.ui.geometry.Size(tileSize, tileSize),
-                cornerRadius = androidx.compose.ui.geometry.CornerRadius(14f, 14f)
-            )
-
-            // Center subtle tactile dot
+                drawLine(
+                    color = colColor,
+                    start = Offset(colX, yOffset),
+                    end = Offset(colX, yOffset + 45f + (c % 4) * 12f),
+                    strokeWidth = 2.2f,
+                    cap = StrokeCap.Round
+                )
+                drawCircle(
+                    color = Color.White.copy(alpha = 0.35f),
+                    radius = 1.8f,
+                    center = Offset(colX, yOffset + 45f + (c % 4) * 12f)
+                )
+            }
+        }
+        "cosmic_nebula" -> {
+            // Rotating cosmic starfield & nebula glow blobs
+            val neb1 = Offset(size.width * 0.25f, size.height * 0.3f)
+            val neb2 = Offset(size.width * 0.78f, size.height * 0.72f)
             drawCircle(
-                color = dotColor,
-                radius = 2.2f,
-                center = Offset(cellLeft + tileSize / 2f, cellTop + tileSize / 2f)
+                brush = Brush.radialGradient(
+                    colors = listOf(Color(0xFF6366F1).copy(alpha = 0.14f * pulseAlpha), Color.Transparent),
+                    center = neb1,
+                    radius = size.width * 0.45f
+                ),
+                center = neb1,
+                radius = size.width * 0.45f
+            )
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(Color(0xFFA855F7).copy(alpha = 0.12f), Color.Transparent),
+                    center = neb2,
+                    radius = size.width * 0.5f
+                ),
+                center = neb2,
+                radius = size.width * 0.5f
+            )
+            // Static/pulsing twinkle stars
+            for (i in 0 until 18) {
+                val sx = ((i * 137.5f) % size.width)
+                val sy = ((i * 219.3f) % size.height)
+                val starAlpha = (0.2f + 0.45f * sin((dashPhase * 0.1f + i).toDouble()).toFloat().coerceIn(0f, 1f))
+                drawCircle(
+                    color = Color.White.copy(alpha = starAlpha),
+                    radius = if (i % 3 == 0) 2.2f else 1.4f,
+                    center = Offset(sx, sy)
+                )
+            }
+        }
+        "zen_sakura_drift" -> {
+            // Gentle drifting sakura blossom petals
+            for (p in 0 until 12) {
+                val driftX = ((p * 73f + dashPhase * 12f) % (size.width + 60f)) - 30f
+                val driftY = ((p * 113f + dashPhase * 24f + sin(p + dashPhase * 0.05) * 20f) % (size.height + 60f)).toFloat()
+                drawCircle(
+                    color = Color(0xFFFDA4AF).copy(alpha = 0.28f),
+                    radius = 3.5f + (p % 3) * 1.5f,
+                    center = Offset(driftX, driftY)
+                )
+            }
+        }
+        "deep_ocean_rays" -> {
+            // Rising underwater bioluminescent bubbles
+            for (b in 0 until 14) {
+                val bx = ((b * 91f + sin(b + dashPhase * 0.08) * 15f) % (size.width + 40f)).toFloat()
+                val by = (size.height - ((dashPhase * (18f + b * 2f) + b * 70f) % (size.height + 60f)))
+                drawCircle(
+                    color = Color(0xFF2DD4BF).copy(alpha = 0.25f),
+                    radius = 2.5f + (b % 4) * 1.2f,
+                    style = Stroke(width = 1.2f),
+                    center = Offset(bx, by)
+                )
+            }
+        }
+        "molten_cinders" -> {
+            // Rising glowing magma heat cinders
+            for (c in 0 until 16) {
+                val cx = ((c * 83f + sin(c + dashPhase * 0.1) * 25f) % (size.width + 40f)).toFloat()
+                val cy = (size.height - ((dashPhase * (32f + c * 3f) + c * 50f) % (size.height + 60f)))
+                val cinderColor = if (c % 2 == 0) Color(0xFFF97316) else Color(0xFFEF4444)
+                drawCircle(
+                    color = cinderColor.copy(alpha = 0.35f),
+                    radius = 2f + (c % 3) * 1.2f,
+                    center = Offset(cx, cy)
+                )
+            }
+        }
+        else -> {
+            // Subtle ambient breathing aura for light themes
+            val centerPoint = Offset(size.width * 0.5f, size.height * 0.45f)
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(theme.headerGold.copy(alpha = 0.04f * pulseAlpha), Color.Transparent),
+                    center = centerPoint,
+                    radius = size.width * 0.6f
+                ),
+                center = centerPoint,
+                radius = size.width * 0.6f
             )
         }
     }
 }
 
 /**
- * Renders an arrow with soft drop shadow, crisp geometric lines, and hint halo.
+ * Draws rounded board card and custom tactile/styled maze grid cells according to equipped cosmetic override.
+ */
+private fun DrawScope.drawCustomBoardAndGrid(
+    originX: Float,
+    originY: Float,
+    gridW: Int,
+    gridH: Int,
+    cellSize: Float,
+    theme: GameTheme,
+    boardCanvas: BoardCanvasType,
+    gridStyle: MazeGridStyle,
+    pulseAlpha: Float
+) {
+    val boardPadding = 10f
+    val boardLeft = originX - boardPadding
+    val boardTop = originY - boardPadding
+    val boardWidth = gridW * cellSize + boardPadding * 2
+    val boardHeight = gridH * cellSize + boardPadding * 2
+
+    // 1. Render Board Canvas Container
+    when (boardCanvas) {
+        BoardCanvasType.CARBON_HEXAGON -> {
+            drawRoundRect(
+                color = Color(0xFF141416),
+                topLeft = Offset(boardLeft, boardTop),
+                size = androidx.compose.ui.geometry.Size(boardWidth, boardHeight),
+                cornerRadius = androidx.compose.ui.geometry.CornerRadius(24f, 24f)
+            )
+            // Carbon edge border
+            drawRoundRect(
+                color = Color(0xFF2C2D35),
+                topLeft = Offset(boardLeft, boardTop),
+                size = androidx.compose.ui.geometry.Size(boardWidth, boardHeight),
+                cornerRadius = androidx.compose.ui.geometry.CornerRadius(24f, 24f),
+                style = Stroke(width = 2.5f)
+            )
+        }
+        BoardCanvasType.HOLOGRAPHIC_GLASS -> {
+            drawRoundRect(
+                color = Color(0xFF0F172A).copy(alpha = 0.85f),
+                topLeft = Offset(boardLeft, boardTop),
+                size = androidx.compose.ui.geometry.Size(boardWidth, boardHeight),
+                cornerRadius = androidx.compose.ui.geometry.CornerRadius(24f, 24f)
+            )
+            drawRoundRect(
+                brush = Brush.linearGradient(
+                    colors = listOf(Color(0xFF00E5FF).copy(alpha = 0.6f), Color(0xFFA855F7).copy(alpha = 0.6f))
+                ),
+                topLeft = Offset(boardLeft, boardTop),
+                size = androidx.compose.ui.geometry.Size(boardWidth, boardHeight),
+                cornerRadius = androidx.compose.ui.geometry.CornerRadius(24f, 24f),
+                style = Stroke(width = 2f)
+            )
+        }
+        BoardCanvasType.JAPANESE_TATAMI -> {
+            drawRoundRect(
+                color = Color(0xFFE8DECA),
+                topLeft = Offset(boardLeft, boardTop),
+                size = androidx.compose.ui.geometry.Size(boardWidth, boardHeight),
+                cornerRadius = androidx.compose.ui.geometry.CornerRadius(20f, 20f)
+            )
+            drawRoundRect(
+                color = Color(0xFF3E2723),
+                topLeft = Offset(boardLeft, boardTop),
+                size = androidx.compose.ui.geometry.Size(boardWidth, boardHeight),
+                cornerRadius = androidx.compose.ui.geometry.CornerRadius(20f, 20f),
+                style = Stroke(width = 3.5f)
+            )
+        }
+        BoardCanvasType.RETRO_CRT -> {
+            drawRoundRect(
+                color = Color(0xFF051205),
+                topLeft = Offset(boardLeft, boardTop),
+                size = androidx.compose.ui.geometry.Size(boardWidth, boardHeight),
+                cornerRadius = androidx.compose.ui.geometry.CornerRadius(18f, 18f)
+            )
+            drawRoundRect(
+                color = Color(0xFF22C55E).copy(alpha = 0.5f),
+                topLeft = Offset(boardLeft, boardTop),
+                size = androidx.compose.ui.geometry.Size(boardWidth, boardHeight),
+                cornerRadius = androidx.compose.ui.geometry.CornerRadius(18f, 18f),
+                style = Stroke(width = 2f)
+            )
+        }
+        BoardCanvasType.MINIMAL_OLED -> {
+            drawRoundRect(
+                color = Color.Black,
+                topLeft = Offset(boardLeft, boardTop),
+                size = androidx.compose.ui.geometry.Size(boardWidth, boardHeight),
+                cornerRadius = androidx.compose.ui.geometry.CornerRadius(24f, 24f)
+            )
+            drawRoundRect(
+                color = Color(0xFF3F3F46),
+                topLeft = Offset(boardLeft, boardTop),
+                size = androidx.compose.ui.geometry.Size(boardWidth, boardHeight),
+                cornerRadius = androidx.compose.ui.geometry.CornerRadius(24f, 24f),
+                style = Stroke(width = 1.5f)
+            )
+        }
+        else -> {
+            // Default Theme Board Container
+            drawRoundRect(
+                color = theme.boardBackground,
+                topLeft = Offset(boardLeft, boardTop),
+                size = androidx.compose.ui.geometry.Size(boardWidth, boardHeight),
+                cornerRadius = androidx.compose.ui.geometry.CornerRadius(24f, 24f)
+            )
+            if (theme.isDark) {
+                drawRoundRect(
+                    color = theme.bannerBorder.copy(alpha = 0.3f),
+                    topLeft = Offset(boardLeft, boardTop),
+                    size = androidx.compose.ui.geometry.Size(boardWidth, boardHeight),
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(24f, 24f),
+                    style = Stroke(width = 1.2f)
+                )
+            }
+        }
+    }
+
+    // 2. Render Cell Tiles & Maze Grid Pattern
+    val tileInset = cellSize * 0.07f
+    val tileSize = cellSize - tileInset * 2
+    val defaultCellTileColor = if (theme.isDark) Color(0xFF241B35).copy(alpha = 0.75f) else theme.cardBg
+    val defaultDotColor = if (theme.isDark) theme.arrowStroke.copy(alpha = 0.35f) else theme.textSecondary.copy(alpha = 0.25f)
+
+    for (x in 0 until gridW) {
+        for (y in 0 until gridH) {
+            val cellLeft = originX + x * cellSize + tileInset
+            val cellTop = originY + y * cellSize + tileInset
+            val cellCenterX = cellLeft + tileSize / 2f
+            val cellCenterY = cellTop + tileSize / 2f
+
+            when (gridStyle) {
+                MazeGridStyle.CIRCUIT_PCB -> {
+                    // PCB Copper track tile
+                    drawRoundRect(
+                        color = Color(0xFF0F2B1D),
+                        topLeft = Offset(cellLeft, cellTop),
+                        size = androidx.compose.ui.geometry.Size(tileSize, tileSize),
+                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(8f, 8f)
+                    )
+                    // Gold solder pad
+                    drawCircle(
+                        color = Color(0xFFFBBF24).copy(alpha = 0.7f),
+                        radius = 3.2f,
+                        center = Offset(cellCenterX, cellCenterY)
+                    )
+                }
+                MazeGridStyle.CONSTELLATION_NET -> {
+                    drawRoundRect(
+                        color = Color(0xFF161938).copy(alpha = 0.6f),
+                        topLeft = Offset(cellLeft, cellTop),
+                        size = androidx.compose.ui.geometry.Size(tileSize, tileSize),
+                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(14f, 14f)
+                    )
+                    // Star node diamond
+                    drawCircle(
+                        color = Color(0xFFA5B4FC).copy(alpha = 0.65f),
+                        radius = 2.5f,
+                        center = Offset(cellCenterX, cellCenterY)
+                    )
+                }
+                MazeGridStyle.NEON_TUBE -> {
+                    drawRoundRect(
+                        color = Color(0xFF0A0F1E),
+                        topLeft = Offset(cellLeft, cellTop),
+                        size = androidx.compose.ui.geometry.Size(tileSize, tileSize),
+                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(12f, 12f)
+                    )
+                    drawRoundRect(
+                        color = Color(0xFF00E5FF).copy(alpha = 0.25f),
+                        topLeft = Offset(cellLeft, cellTop),
+                        size = androidx.compose.ui.geometry.Size(tileSize, tileSize),
+                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(12f, 12f),
+                        style = Stroke(width = 1.2f)
+                    )
+                }
+                MazeGridStyle.SUBWAY_MAP -> {
+                    drawRoundRect(
+                        color = Color(0xFFF1F5F9),
+                        topLeft = Offset(cellLeft, cellTop),
+                        size = androidx.compose.ui.geometry.Size(tileSize, tileSize),
+                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(10f, 10f)
+                    )
+                    // Circular station ring
+                    drawCircle(
+                        color = Color(0xFF0284C7).copy(alpha = 0.6f),
+                        radius = 3.5f,
+                        style = Stroke(width = 1.5f),
+                        center = Offset(cellCenterX, cellCenterY)
+                    )
+                }
+                else -> {
+                    // Default Theme Cell Tiles
+                    drawRoundRect(
+                        color = defaultCellTileColor,
+                        topLeft = Offset(cellLeft, cellTop),
+                        size = androidx.compose.ui.geometry.Size(tileSize, tileSize),
+                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(14f, 14f)
+                    )
+                    drawCircle(
+                        color = defaultDotColor,
+                        radius = 2.2f,
+                        center = Offset(cellCenterX, cellCenterY)
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Renders an arrow with soft drop shadow, crisp geometric lines, custom arrow skins, and hint halo.
  */
 private fun DrawScope.drawArrowItem(
     arrow: ArrowItem,
@@ -511,7 +848,8 @@ private fun DrawScope.drawArrowItem(
     strokeColor: Color,
     isHinted: Boolean,
     pulseAlpha: Float,
-    theme: GameTheme
+    theme: GameTheme,
+    arrowSkin: ArrowSkinType = ArrowSkinType.DEFAULT
 ) {
     if (arrow.points.isEmpty()) return
 
@@ -519,7 +857,7 @@ private fun DrawScope.drawArrowItem(
     val headCenterX = originX + headPt.x * cellSize + cellSize / 2f
     val headCenterY = originY + headPt.y * cellSize + cellSize / 2f
 
-    // Glowing yellow hint aura centered on arrowhead
+    // Glowing hint aura centered on arrowhead
     if (isHinted) {
         drawCircle(
             color = theme.headerGold.copy(alpha = pulseAlpha * 0.45f),
@@ -554,12 +892,12 @@ private fun DrawScope.drawArrowItem(
         }
 
         // Soft drop shadow underneath body
-        val shadowColor = if (theme.isDark) Color.Black.copy(alpha = 0.4f) else Color(0x33000000)
+        val shadowColor = if (theme.isDark) Color.Black.copy(alpha = 0.45f) else Color(0x33000000)
         drawPath(
             path = shadowPath,
             color = shadowColor,
             style = Stroke(
-                width = strokeWidth + 2f,
+                width = strokeWidth + 2.5f,
                 cap = StrokeCap.Round,
                 join = StrokeJoin.Round
             )
@@ -578,6 +916,35 @@ private fun DrawScope.drawArrowItem(
             )
         }
 
+        // Custom Arrow Skin Body Enhancements
+        when (arrowSkin) {
+            ArrowSkinType.HYPERDRIVE_PRISM -> {
+                // Rainbow refraction outer line
+                drawPath(
+                    path = path,
+                    color = Color(0xFF00E5FF).copy(alpha = 0.5f),
+                    style = Stroke(width = strokeWidth * 1.5f, cap = StrokeCap.Round, join = StrokeJoin.Round)
+                )
+            }
+            ArrowSkinType.STEAMPUNK_BRASS -> {
+                // Polished brass metallic outer sleeve
+                drawPath(
+                    path = path,
+                    color = Color(0xFFB45309).copy(alpha = 0.6f),
+                    style = Stroke(width = strokeWidth * 1.4f, cap = StrokeCap.Round, join = StrokeJoin.Round)
+                )
+            }
+            ArrowSkinType.CYBER_DRAGON -> {
+                // Cyber dragon neon spine
+                drawPath(
+                    path = path,
+                    color = Color(0xFF10B981).copy(alpha = 0.45f),
+                    style = Stroke(width = strokeWidth * 1.6f, cap = StrokeCap.Round, join = StrokeJoin.Round)
+                )
+            }
+            else -> {}
+        }
+
         // Main arrow body
         drawPath(
             path = path,
@@ -592,12 +959,105 @@ private fun DrawScope.drawArrowItem(
 
     // Arrowhead at the last point
     val headColor = if (arrow.isGhost) Color(0xFFA855F7) else strokeColor
-    drawArrowHead(
+    drawCustomArrowHead(
         center = Offset(headCenterX, headCenterY),
         direction = arrow.headDirection,
         size = strokeWidth * 2.3f,
-        color = headColor
+        color = headColor,
+        skin = arrowSkin
     )
+}
+
+private fun DrawScope.drawCustomArrowHead(
+    center: Offset,
+    direction: Direction,
+    size: Float,
+    color: Color,
+    skin: ArrowSkinType
+) {
+    val angleRad = Math.toRadians(direction.angleDegrees.toDouble()).toFloat()
+
+    when (skin) {
+        ArrowSkinType.HYPERDRIVE_PRISM -> {
+            // Prismatic Diamond Crystal Arrow
+            val tip = Offset(center.x + cos(angleRad) * (size * 1.1f), center.y + sin(angleRad) * (size * 1.1f))
+            val back = Offset(center.x - cos(angleRad) * (size * 0.7f), center.y - sin(angleRad) * (size * 0.7f))
+            val leftSide = Offset(center.x + cos(angleRad + PI.toFloat() / 2f) * (size * 0.8f), center.y + sin(angleRad + PI.toFloat() / 2f) * (size * 0.8f))
+            val rightSide = Offset(center.x + cos(angleRad - PI.toFloat() / 2f) * (size * 0.8f), center.y + sin(angleRad - PI.toFloat() / 2f) * (size * 0.8f))
+
+            val diamondPath = Path().apply {
+                moveTo(tip.x, tip.y)
+                lineTo(leftSide.x, leftSide.y)
+                lineTo(back.x, back.y)
+                lineTo(rightSide.x, rightSide.y)
+                close()
+            }
+            drawPath(path = diamondPath, color = color)
+            drawPath(path = diamondPath, color = Color.White.copy(alpha = 0.65f), style = Stroke(width = 1.8f))
+        }
+        ArrowSkinType.CYBER_DRAGON -> {
+            // Cyber Dragon articulated chevron
+            val tip = Offset(center.x + cos(angleRad) * (size * 1.15f), center.y + sin(angleRad) * (size * 1.15f))
+            val leftAngle = angleRad + Math.toRadians(150.0).toFloat()
+            val rightAngle = angleRad - Math.toRadians(150.0).toFloat()
+            val p1 = Offset(tip.x + cos(leftAngle) * (size * 1.1f), tip.y + sin(leftAngle) * (size * 1.1f))
+            val p2 = Offset(tip.x + cos(rightAngle) * (size * 1.1f), tip.y + sin(rightAngle) * (size * 1.1f))
+            val innerBack = Offset(tip.x - cos(angleRad) * (size * 0.6f), tip.y - sin(angleRad) * (size * 0.6f))
+
+            val dragonPath = Path().apply {
+                moveTo(tip.x, tip.y)
+                lineTo(p1.x, p1.y)
+                lineTo(innerBack.x, innerBack.y)
+                lineTo(p2.x, p2.y)
+                close()
+            }
+            drawPath(path = dragonPath, color = color)
+            drawCircle(color = Color(0xFF00E5FF), radius = 2.2f, center = Offset(tip.x - cos(angleRad) * 4f, tip.y - sin(angleRad) * 4f))
+        }
+        ArrowSkinType.STEAMPUNK_BRASS -> {
+            // Mechanical Gear & Arrow
+            val tip = Offset(center.x + cos(angleRad) * size, center.y + sin(angleRad) * size)
+            val leftAngle = angleRad + Math.toRadians(138.0).toFloat()
+            val rightAngle = angleRad - Math.toRadians(138.0).toFloat()
+            val p1 = Offset(tip.x + cos(leftAngle) * size, tip.y + sin(leftAngle) * size)
+            val p2 = Offset(tip.x + cos(rightAngle) * size, tip.y + sin(rightAngle) * size)
+
+            val headPath = Path().apply {
+                moveTo(tip.x, tip.y)
+                lineTo(p1.x, p1.y)
+                lineTo(p2.x, p2.y)
+                close()
+            }
+            drawPath(path = headPath, color = color)
+            // Clockwork brass center rivet
+            drawCircle(color = Color(0xFFFBBF24), radius = 3.2f, center = center)
+            drawCircle(color = Color(0xFF451A03), radius = 1.4f, center = center)
+        }
+        ArrowSkinType.APOLLO_ROCKET -> {
+            // Rocket needle cone + exhaust plume
+            val tip = Offset(center.x + cos(angleRad) * (size * 1.25f), center.y + sin(angleRad) * (size * 1.25f))
+            val leftAngle = angleRad + Math.toRadians(140.0).toFloat()
+            val rightAngle = angleRad - Math.toRadians(140.0).toFloat()
+            val p1 = Offset(tip.x + cos(leftAngle) * size, tip.y + sin(leftAngle) * size)
+            val p2 = Offset(tip.x + cos(rightAngle) * size, tip.y + sin(rightAngle) * size)
+
+            val rocketPath = Path().apply {
+                moveTo(tip.x, tip.y)
+                lineTo(p1.x, p1.y)
+                lineTo(center.x, center.y)
+                lineTo(p2.x, p2.y)
+                close()
+            }
+            drawPath(path = rocketPath, color = color)
+            // Propulsion flame spark
+            val flame = Offset(center.x - cos(angleRad) * (size * 0.5f), center.y - sin(angleRad) * (size * 0.5f))
+            drawCircle(color = Color(0xFFF97316), radius = 3f, center = flame)
+        }
+        else -> {
+            // Classic Arrowhead
+            drawOrientedArrowHead(center, direction.angleDegrees, size, color)
+        }
+    }
 }
 
 /**

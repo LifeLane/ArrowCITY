@@ -6,6 +6,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -17,6 +20,7 @@ import com.example.ui.components.AmazeGameBoard
 import com.example.ui.components.CosmeticStoreDialog
 import com.example.ui.components.DailyChallengeDialog
 import com.example.ui.components.GameBottomBar
+import com.example.ui.components.GameConfirmationDialog
 import com.example.ui.components.GameTopBar
 import com.example.ui.components.LevelCompleteDialog
 import com.example.ui.components.LevelFailedDialog
@@ -88,7 +92,8 @@ fun GameScreen(
                     maxDrops = uiState.maxDrops,
                     sessionSeconds = uiState.sessionSeconds,
                     theme = theme,
-                    onBackClicked = { viewModel.setMainMenuActive(true) },
+                    onBackClicked = { viewModel.requestExit() },
+                    onResetClicked = { viewModel.requestReset() },
                     onThemeClicked = { viewModel.openThemeSelect(true) },
                     onSettingsClicked = { viewModel.openSettings(true) }
                 )
@@ -198,6 +203,10 @@ fun GameScreen(
             uiState = uiState,
             onSelectTheme = { th -> viewModel.setTheme(th) },
             onSelectTrail = { tr -> viewModel.setParticleTrail(tr) },
+            onEquipArrowSkin = { skin -> viewModel.setEquippedArrowSkin(skin) },
+            onEquipBoardCanvas = { canvas -> viewModel.setEquippedBoardCanvas(canvas) },
+            onEquipGridStyle = { grid -> viewModel.setEquippedGridStyle(grid) },
+            onEquipBgAnim = { anim -> viewModel.setEquippedBackgroundAnim(anim) },
             onDismiss = { viewModel.openStore(false) }
         )
     }
@@ -213,6 +222,32 @@ fun GameScreen(
         AboutInfoDialog(
             uiState = uiState,
             onDismiss = { viewModel.openAbout(false) }
+        )
+    }
+
+    if (uiState.isExitConfirmOpen) {
+        GameConfirmationDialog(
+            title = "Leave Current Puzzle?",
+            message = "Your mindful flow progress and move counts for this puzzle will be reset if you return to the main menu.",
+            confirmButtonText = "Exit to Menu",
+            dismissButtonText = "Stay & Play",
+            icon = Icons.AutoMirrored.Filled.ArrowBack,
+            theme = theme,
+            onConfirm = { viewModel.confirmExit() },
+            onDismiss = { viewModel.openExitConfirm(false) }
+        )
+    }
+
+    if (uiState.isResetConfirmOpen) {
+        GameConfirmationDialog(
+            title = "Restart Puzzle?",
+            message = "Reset all arrows back to their starting city grid positions and restore your move counter.",
+            confirmButtonText = "Restart Level",
+            dismissButtonText = "Keep Playing",
+            icon = Icons.Outlined.Refresh,
+            theme = theme,
+            onConfirm = { viewModel.confirmReset() },
+            onDismiss = { viewModel.openResetConfirm(false) }
         )
     }
 }

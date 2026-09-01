@@ -10,12 +10,16 @@ import com.example.audio.SoundManager
 import com.example.engine.LevelRepository
 import com.example.engine.PuzzleSolver
 import com.example.model.ArrowItem
+import com.example.model.ArrowSkinType
+import com.example.model.BackgroundAnimType
+import com.example.model.BoardCanvasType
 import com.example.model.CollisionInfo
 import com.example.model.ComboRewardEvent
 import com.example.model.GameTheme
 import com.example.model.GridPoint
 import com.example.model.ImpactSpark
 import com.example.model.LevelData
+import com.example.model.MazeGridStyle
 import com.example.model.MoveHistoryState
 import com.example.model.PowerUpType
 import com.example.model.ShockwaveRing
@@ -54,6 +58,8 @@ data class GameUiState(
     val completionStars: Int = 3,
     val completionTimeSeconds: Long = 0,
     val sessionSeconds: Long = 0,
+    val isExitConfirmOpen: Boolean = false,
+    val isResetConfirmOpen: Boolean = false,
     val isLevelSelectOpen: Boolean = false,
     val isThemeSelectOpen: Boolean = false,
     val isSettingsOpen: Boolean = false,
@@ -64,6 +70,10 @@ data class GameUiState(
     val isAboutOpen: Boolean = false,
     val isVipRewardsOpen: Boolean = false,
     val selectedTheme: GameTheme = GameThemes.EyeComfort,
+    val equippedArrowSkin: ArrowSkinType = ArrowSkinType.DEFAULT,
+    val equippedBoardCanvas: BoardCanvasType = BoardCanvasType.DEFAULT,
+    val equippedGridStyle: MazeGridStyle = MazeGridStyle.DEFAULT,
+    val equippedBackgroundAnim: BackgroundAnimType = BackgroundAnimType.DEFAULT,
     val highestUnlockedLevel: Int = 1,
     val completedLevelsStars: Map<Int, Int> = emptyMap(),
     val totalPuzzlesSolved: Int = 0,
@@ -137,8 +147,16 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         val haptic = prefs.getBoolean("haptic_enabled", true)
         val hints = prefs.getInt("hints_count", 3)
         val themeId = prefs.getString("selected_theme", GameThemes.EyeComfort.id)
+        val arrowSkinId = prefs.getString("equipped_arrow_skin", ArrowSkinType.DEFAULT.id)
+        val boardCanvasId = prefs.getString("equipped_board_canvas", BoardCanvasType.DEFAULT.id)
+        val gridStyleId = prefs.getString("equipped_grid_style", MazeGridStyle.DEFAULT.id)
+        val bgAnimId = prefs.getString("equipped_bg_anim", BackgroundAnimType.DEFAULT.id)
 
         val theme = GameThemes.allThemes.find { it.id == themeId } ?: GameThemes.EyeComfort
+        val arrowSkin = ArrowSkinType.entries.find { it.id == arrowSkinId } ?: ArrowSkinType.DEFAULT
+        val boardCanvas = BoardCanvasType.entries.find { it.id == boardCanvasId } ?: BoardCanvasType.DEFAULT
+        val gridStyle = MazeGridStyle.entries.find { it.id == gridStyleId } ?: MazeGridStyle.DEFAULT
+        val bgAnim = BackgroundAnimType.entries.find { it.id == bgAnimId } ?: BackgroundAnimType.DEFAULT
         val solvedCount = prefs.getInt("puzzles_solved", 0)
         val bestCombo = prefs.getInt("best_combo", 1)
         val powerupsUsed = prefs.getInt("powerups_used", 0)
@@ -175,7 +193,11 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 ambientNatureEnabled = ambientSound,
                 hapticEnabled = haptic,
                 hintsRemaining = hints,
-                selectedTheme = theme
+                selectedTheme = theme,
+                equippedArrowSkin = arrowSkin,
+                equippedBoardCanvas = boardCanvas,
+                equippedGridStyle = gridStyle,
+                equippedBackgroundAnim = bgAnim
             )
         }
     }
@@ -819,6 +841,30 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun setEquippedArrowSkin(skin: ArrowSkinType) {
+        prefs.edit().putString("equipped_arrow_skin", skin.id).apply()
+        _uiState.update { it.copy(equippedArrowSkin = skin) }
+        soundManager.playTap()
+    }
+
+    fun setEquippedBoardCanvas(canvas: BoardCanvasType) {
+        prefs.edit().putString("equipped_board_canvas", canvas.id).apply()
+        _uiState.update { it.copy(equippedBoardCanvas = canvas) }
+        soundManager.playTap()
+    }
+
+    fun setEquippedGridStyle(gridStyle: MazeGridStyle) {
+        prefs.edit().putString("equipped_grid_style", gridStyle.id).apply()
+        _uiState.update { it.copy(equippedGridStyle = gridStyle) }
+        soundManager.playTap()
+    }
+
+    fun setEquippedBackgroundAnim(bgAnim: BackgroundAnimType) {
+        prefs.edit().putString("equipped_bg_anim", bgAnim.id).apply()
+        _uiState.update { it.copy(equippedBackgroundAnim = bgAnim) }
+        soundManager.playTap()
+    }
+
     fun toggleAmbientNature(enabled: Boolean) {
         soundManager.setAmbientNature(enabled)
         prefs.edit().putBoolean("ambient_nature_enabled", enabled).apply()
@@ -898,6 +944,44 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
 
     fun openLevelSelect(open: Boolean) {
         _uiState.update { it.copy(isLevelSelectOpen = open) }
+    }
+
+    fun openExitConfirm(open: Boolean) {
+        _uiState.update { it.copy(isExitConfirmOpen = open) }
+    }
+
+    fun openResetConfirm(open: Boolean) {
+        _uiState.update { it.copy(isResetConfirmOpen = open) }
+    }
+
+    fun requestExit() {
+        val state = _uiState.value
+        if (state.movesCount > 0 && !state.isLevelCompleted && !state.isLevelFailed) {
+            soundManager.playTap()
+            openExitConfirm(true)
+        } else {
+            setMainMenuActive(true)
+        }
+    }
+
+    fun requestReset() {
+        val state = _uiState.value
+        if (state.movesCount > 0 && !state.isLevelCompleted && !state.isLevelFailed) {
+            soundManager.playTap()
+            openResetConfirm(true)
+        } else {
+            restartCurrentLevel()
+        }
+    }
+
+    fun confirmExit() {
+        openExitConfirm(false)
+        setMainMenuActive(true)
+    }
+
+    fun confirmReset() {
+        openResetConfirm(false)
+        restartCurrentLevel()
     }
 
     fun openThemeSelect(open: Boolean) {
