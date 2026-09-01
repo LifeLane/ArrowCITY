@@ -1,6 +1,6 @@
 {
-  "name": "Amaze GO!",
-  "description": "A clean, meditative arrow puzzle game built to calm a busy mind. Choose the right order to slide arrows off the grid and untangle brain teasers.",
+  "name": "Arrow City",
+  "description": "Arrow City Beta v1.0.0 - A sleek, meditative cyberpunk arrow escape puzzle game. Untangle maze grid pathways, unlock all free early access themes and trails, and reach peak flow state with zero ads or sign-in.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

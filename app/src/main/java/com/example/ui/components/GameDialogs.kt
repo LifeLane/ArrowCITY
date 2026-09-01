@@ -1225,12 +1225,22 @@ fun CosmeticStoreDialog(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = "Cosmetic Studio",
-                        fontSize = 22.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = theme.headerGold
-                    )
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = "Arrow City Studio",
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = theme.headerGold
+                        )
+                        Text(
+                            text = "🎁 Early Access Reward: All 100% Free",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = theme.dropActiveColor
+                        )
+                    }
                     IconButton(onClick = onDismiss) {
                         Icon(Icons.Outlined.Close, contentDescription = "Close", tint = theme.textSecondary)
                     }
@@ -1502,7 +1512,7 @@ fun AboutInfoDialog(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    text = "Amaze Go • Arrow Escape",
+                    text = "Arrow City • Beta v1.0.0",
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold,
                     color = theme.headerGold
@@ -1511,7 +1521,7 @@ fun AboutInfoDialog(
                 Spacer(modifier = Modifier.height(6.dp))
 
                 Text(
-                    text = "v1.0.0 • Offline Ready Zen Experience",
+                    text = "com.mitsara.arrowcity • Beta Early Access",
                     fontSize = 12.sp,
                     color = theme.textSecondary
                 )
@@ -1527,10 +1537,10 @@ fun AboutInfoDialog(
                         modifier = Modifier.padding(14.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Text("• Tap any arrow to launch it into motion along its direction.", fontSize = 12.sp, color = theme.textPrimary)
-                        Text("• Long press on an arrow to view its forward trajectory guide.", fontSize = 12.sp, color = theme.textPrimary)
-                        Text("• Use free Snip, Ghost, Magnet, and Recall power-ups when blocked.", fontSize = 12.sp, color = theme.textPrimary)
-                        Text("• All puzzles are 100% playable offline anytime.", fontSize = 12.sp, color = theme.textPrimary)
+                        Text("• Tap clear arrows to navigate the city maze grid.", fontSize = 12.sp, color = theme.textPrimary)
+                        Text("• Early Access Perks: All themes & particle trails 100% free.", fontSize = 12.sp, color = theme.textPrimary)
+                        Text("• Zero Ads • Zero Sign-In Required • Privacy First.", fontSize = 12.sp, color = theme.textPrimary)
+                        Text("• 100% playable offline anytime anywhere.", fontSize = 12.sp, color = theme.textPrimary)
                     }
                 }
 

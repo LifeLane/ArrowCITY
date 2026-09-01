@@ -312,10 +312,10 @@ fun MainHomeScreen(
 
                 // Title & Subtitle
                 Text(
-                    text = "ARROW ESCAPE",
-                    fontSize = 28.sp,
+                    text = "ARROW CITY",
+                    fontSize = 30.sp,
                     fontWeight = FontWeight.Black,
-                    letterSpacing = 3.sp,
+                    letterSpacing = 4.sp,
                     color = theme.textPrimary,
                     textAlign = TextAlign.Center
                 )
@@ -323,8 +323,8 @@ fun MainHomeScreen(
                 Spacer(modifier = Modifier.height(6.dp))
 
                 Text(
-                    text = "Tap clear arrows. Free the board.",
-                    fontSize = 14.sp,
+                    text = "Navigate city maze grids • Beta Early Access",
+                    fontSize = 13.sp,
                     fontWeight = FontWeight.Medium,
                     color = theme.textSecondary,
                     textAlign = TextAlign.Center
@@ -443,7 +443,7 @@ fun MainHomeScreen(
                         modifier = Modifier.size(16.dp)
                     )
                     Text(
-                        text = "v1.0.0 • Offline Ready Zen Mode",
+                        text = "Beta v1.0.0 • No Ads • Offline Ready",
                         fontSize = 12.sp,
                         color = theme.textSecondary,
                         fontWeight = FontWeight.Medium

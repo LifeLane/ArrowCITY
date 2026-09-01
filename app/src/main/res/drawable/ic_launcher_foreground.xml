@@ -1,4 +1,5 @@
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
@@ -6,27 +7,59 @@
     <group
         android:pivotX="54"
         android:pivotY="54"
-        android:scaleX="0.82"
-        android:scaleY="0.82">
+        android:scaleX="0.84"
+        android:scaleY="0.84">
+        <!-- City Maze Grid Lines -->
         <path
             android:fillColor="#00000000"
-            android:pathData="M32,76 L32,36 L76,36 L76,68 L48,68 L48,50 L64,50"
-            android:strokeColor="#5D4037"
-            android:strokeWidth="6"
+            android:pathData="M26,80 L26,52 L48,52 L48,28 L82,28 L82,56 L62,56 L62,80"
+            android:strokeColor="#1E3A8A"
+            android:strokeWidth="5"
             android:strokeLineCap="round"
             android:strokeLineJoin="round" />
-        <path
-            android:fillColor="#E65100"
-            android:pathData="M62,44 L72,50 L62,56 Z" />
+
         <path
             android:fillColor="#00000000"
-            android:pathData="M24,64 L24,24 L84,24 L84,84 L44,84"
-            android:strokeColor="#8D6E63"
-            android:strokeWidth="4"
+            android:pathData="M38,82 L38,64 L64,64 L64,40 L78,40"
+            android:strokeColor="#0284C7"
+            android:strokeWidth="3.5"
             android:strokeLineCap="round"
             android:strokeLineJoin="round" />
+
+        <!-- Arrow City Soaring Glowing Arrow -->
+        <!-- Neon Glow Underlayer -->
         <path
-            android:fillColor="#0288D1"
-            android:pathData="M46,79 L36,84 L46,89 Z" />
+            android:fillColor="#00000000"
+            android:pathData="M54,78 L54,34 M38,48 L54,30 L70,48"
+            android:strokeColor="#38BDF8"
+            android:strokeAlpha="0.4"
+            android:strokeWidth="14"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round" />
+
+        <!-- Bold Core Arrow Body -->
+        <path
+            android:fillColor="#00000000"
+            android:pathData="M54,76 L54,36 M40,50 L54,32 L68,50"
+            android:strokeColor="#00E5FF"
+            android:strokeWidth="8"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round" />
+
+        <!-- Sharp Arrow Head Cap -->
+        <path
+            android:fillColor="#FFD600"
+            android:pathData="M54,24 L66,42 L54,37 L42,42 Z" />
+
+        <!-- Mini Energy Sparks -->
+        <path
+            android:fillColor="#38BDF8"
+            android:pathData="M30,36 A3,3 0 1,1 30,35.9 Z" />
+        <path
+            android:fillColor="#F43F5E"
+            android:pathData="M78,72 A3,3 0 1,1 78,71.9 Z" />
+        <path
+            android:fillColor="#FFD600"
+            android:pathData="M76,22 A2.5,2.5 0 1,1 76,21.9 Z" />
     </group>
 </vector>

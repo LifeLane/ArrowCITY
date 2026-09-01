@@ -22,6 +22,6 @@ dependencyResolutionManagement {
   }
 }
 
-rootProject.name = "Amaze GO!"
+rootProject.name = "Arrow City"
 
 include(":app")
