@@ -29,6 +29,7 @@ class GreetingScreenshotTest {
           levelNumber = 10,
           remainingDrops = 3,
           maxDrops = 3,
+          sessionSeconds = 42L,
           theme = GameThemes.EyeComfort,
           onBackClicked = {},
           onThemeClicked = {},

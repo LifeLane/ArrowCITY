@@ -591,11 +591,12 @@ private fun DrawScope.drawArrowItem(
     }
 
     // Arrowhead at the last point
+    val headColor = if (arrow.isGhost) Color(0xFFA855F7) else strokeColor
     drawArrowHead(
         center = Offset(headCenterX, headCenterY),
         direction = arrow.headDirection,
         size = strokeWidth * 2.3f,
-        color = Color.White
+        color = headColor
     )
 }
 
@@ -633,11 +634,12 @@ private fun DrawScope.drawFlyingArrow(
         val currentX = originX + pt.x * cellSize + cellSize / 2f + dir.dx * exitDist * progress
         val currentY = originY + pt.y * cellSize + cellSize / 2f + dir.dy * exitDist * progress
 
+        val headColor = if (arrow.isGhost) Color(0xFFA855F7).copy(alpha = alpha) else strokeColor
         drawArrowHead(
             center = Offset(currentX, currentY),
             direction = dir,
             size = strokeWidth * 2.3f,
-            color = Color.White.copy(alpha = alpha)
+            color = headColor
         )
 
         // Stardust trail
@@ -752,11 +754,12 @@ private fun DrawScope.drawFlyingArrow(
     val tangent = lastVisible - prevVisible
     val angleDegrees = Math.toDegrees(atan2(tangent.y.toDouble(), tangent.x.toDouble())).toFloat()
 
+    val headColor = if (arrow.isGhost) Color(0xFFA855F7).copy(alpha = alpha) else strokeColor
     drawOrientedArrowHead(
         center = lastVisible,
         angleDegrees = angleDegrees,
         size = strokeWidth * 2.3f,
-        color = Color.White.copy(alpha = alpha)
+        color = headColor
     )
 
     // Trailing stardust sparks behind the moving tail

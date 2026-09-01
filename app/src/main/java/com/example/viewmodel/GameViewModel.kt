@@ -37,6 +37,7 @@ data class FlyingArrow(
 )
 
 data class GameUiState(
+    val isMainMenuActive: Boolean = true,
     val currentLevelNumber: Int = 1,
     val levelData: LevelData = LevelRepository.getLevel(1),
     val activeArrows: List<ArrowItem> = emptyList(),
@@ -57,9 +58,20 @@ data class GameUiState(
     val isThemeSelectOpen: Boolean = false,
     val isSettingsOpen: Boolean = false,
     val isZenBreatheOpen: Boolean = false,
+    val isStatsOpen: Boolean = false,
+    val isDailyChallengeOpen: Boolean = false,
+    val isStoreOpen: Boolean = false,
+    val isAboutOpen: Boolean = false,
+    val isVipRewardsOpen: Boolean = false,
     val selectedTheme: GameTheme = GameThemes.EyeComfort,
     val highestUnlockedLevel: Int = 1,
     val completedLevelsStars: Map<Int, Int> = emptyMap(),
+    val totalPuzzlesSolved: Int = 0,
+    val bestComboStreak: Int = 1,
+    val totalPowerUpsUsed: Int = 0,
+    val dailyStreak: Int = 1,
+    val isDailyChallengeCompletedToday: Boolean = false,
+    val selectedParticleTrail: String = "stardust",
     val soundEnabled: Boolean = true,
     val ambientNatureEnabled: Boolean = true,
     val movementSoundEnabled: Boolean = true,
@@ -79,7 +91,10 @@ data class GameUiState(
     val softDustParticles: List<SoftDustParticle> = emptyList(),
     val shockwaves: List<ShockwaveRing> = emptyList(),
     val moveHistory: List<MoveHistoryState> = emptyList()
-)
+) {
+    val totalStars: Int
+        get() = completedLevelsStars.values.sum()
+}
 
 class GameViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -124,6 +139,11 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         val themeId = prefs.getString("selected_theme", GameThemes.EyeComfort.id)
 
         val theme = GameThemes.allThemes.find { it.id == themeId } ?: GameThemes.EyeComfort
+        val solvedCount = prefs.getInt("puzzles_solved", 0)
+        val bestCombo = prefs.getInt("best_combo", 1)
+        val powerupsUsed = prefs.getInt("powerups_used", 0)
+        val streak = prefs.getInt("daily_streak", 1)
+        val trail = prefs.getString("particle_trail", "stardust") ?: "stardust"
 
         // Load all saved star ratings for completed levels
         val starsMap = mutableMapOf<Int, Int>()
@@ -145,6 +165,11 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 currentLevelNumber = currentLvl,
                 highestUnlockedLevel = maxOf(highest, currentLvl),
                 completedLevelsStars = starsMap,
+                totalPuzzlesSolved = if (solvedCount > 0) solvedCount else starsMap.size,
+                bestComboStreak = bestCombo,
+                totalPowerUpsUsed = powerupsUsed,
+                dailyStreak = streak,
+                selectedParticleTrail = trail,
                 soundEnabled = movementSound,
                 movementSoundEnabled = movementSound,
                 ambientNatureEnabled = ambientSound,
@@ -554,10 +579,14 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         val newHighest = maxOf(state.highestUnlockedLevel, state.currentLevelNumber + 1)
         val updatedStars = state.completedLevelsStars.toMutableMap()
         updatedStars[state.currentLevelNumber] = maxOf(updatedStars[state.currentLevelNumber] ?: 0, stars)
+        val newSolvedCount = state.totalPuzzlesSolved + 1
+        val newBestCombo = maxOf(state.bestComboStreak, state.comboMultiplier)
 
         prefs.edit()
             .putInt("highest_level", newHighest)
             .putInt("stars_lvl_${state.currentLevelNumber}", stars)
+            .putInt("puzzles_solved", newSolvedCount)
+            .putInt("best_combo", newBestCombo)
             .apply()
 
         soundManager.playLevelComplete()
@@ -569,6 +598,8 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 completionTimeSeconds = timeSeconds,
                 highestUnlockedLevel = newHighest,
                 completedLevelsStars = updatedStars,
+                totalPuzzlesSolved = newSolvedCount,
+                bestComboStreak = newBestCombo,
                 showComboBanner = false
             )
         }
@@ -808,6 +839,61 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         soundManager.isHapticEnabled = enabled
         prefs.edit().putBoolean("haptic_enabled", enabled).apply()
         _uiState.update { it.copy(hapticEnabled = enabled) }
+    }
+
+    fun setMainMenuActive(active: Boolean) {
+        _uiState.update { it.copy(isMainMenuActive = active) }
+    }
+
+    fun openStats(open: Boolean) {
+        _uiState.update { it.copy(isStatsOpen = open) }
+    }
+
+    fun openDailyChallenge(open: Boolean) {
+        _uiState.update { it.copy(isDailyChallengeOpen = open) }
+    }
+
+    fun openStore(open: Boolean) {
+        _uiState.update { it.copy(isStoreOpen = open) }
+    }
+
+    fun openAbout(open: Boolean) {
+        _uiState.update { it.copy(isAboutOpen = open) }
+    }
+
+    fun openVipRewards(open: Boolean) {
+        _uiState.update { it.copy(isVipRewardsOpen = open) }
+    }
+
+    fun setParticleTrail(trailId: String) {
+        prefs.edit().putString("particle_trail", trailId).apply()
+        _uiState.update { it.copy(selectedParticleTrail = trailId) }
+    }
+
+    fun startDailyChallenge() {
+        // Daily challenge loads level 5 or higher based on day of month with bonus drops
+        val dayLevel = 5 + (System.currentTimeMillis() / (1000 * 60 * 60 * 24) % 15).toInt()
+        loadLevel(dayLevel)
+        _uiState.update {
+            it.copy(
+                isDailyChallengeOpen = false,
+                isMainMenuActive = false
+            )
+        }
+    }
+
+    fun completeDailyChallengeReward() {
+        val newStreak = _uiState.value.dailyStreak + 1
+        prefs.edit()
+            .putInt("daily_streak", newStreak)
+            .putBoolean("daily_completed_today", true)
+            .apply()
+        _uiState.update {
+            it.copy(
+                dailyStreak = newStreak,
+                isDailyChallengeCompletedToday = true
+            )
+        }
     }
 
     fun openLevelSelect(open: Boolean) {

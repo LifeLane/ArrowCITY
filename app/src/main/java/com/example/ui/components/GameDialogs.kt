@@ -29,10 +29,21 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.AutoAwesome
+import androidx.compose.material.icons.outlined.BarChart
+import androidx.compose.material.icons.outlined.CalendarMonth
+import androidx.compose.material.icons.outlined.Check
+import androidx.compose.material.icons.outlined.EmojiEvents
+import androidx.compose.material.icons.outlined.FlashOn
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.SelfImprovement
 import androidx.compose.material.icons.outlined.Star
+import androidx.compose.material.icons.outlined.Timer
+import androidx.compose.material.icons.outlined.WaterDrop
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -892,6 +903,648 @@ fun ZenBreatheDialog(
                         .height(48.dp)
                 ) {
                     Text("Return to Puzzle", color = Color.White, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun StatisticsDialog(
+    uiState: GameUiState,
+    onDismiss: () -> Unit
+) {
+    val theme = uiState.selectedTheme
+    val totalTimeMinutes = uiState.sessionSeconds / 60
+    val totalStars = uiState.totalStars
+
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(containerColor = theme.cardBg),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+                .shadow(16.dp, RoundedCornerShape(24.dp))
+                .testTag("statistics_dialog")
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Player Statistics",
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = theme.headerGold
+                    )
+                    IconButton(onClick = onDismiss) {
+                        Icon(Icons.Outlined.Close, contentDescription = "Close", tint = theme.textSecondary)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Stats Grid
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        StatCard(
+                            title = "Total Stars",
+                            value = "$totalStars",
+                            icon = Icons.Filled.Star,
+                            tint = Color(0xFFFBBF24),
+                            theme = theme,
+                            modifier = Modifier.weight(1f)
+                        )
+                        StatCard(
+                            title = "Puzzles Solved",
+                            value = "${uiState.totalPuzzlesSolved}",
+                            icon = Icons.Outlined.EmojiEvents,
+                            tint = theme.dropActiveColor,
+                            theme = theme,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        StatCard(
+                            title = "Best Combo",
+                            value = "${uiState.bestComboStreak}x",
+                            icon = Icons.Outlined.FlashOn,
+                            tint = Color(0xFFE11D48),
+                            theme = theme,
+                            modifier = Modifier.weight(1f)
+                        )
+                        StatCard(
+                            title = "Flow Time",
+                            value = "${totalTimeMinutes}m",
+                            icon = Icons.Outlined.Timer,
+                            tint = Color(0xFF10B981),
+                            theme = theme,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        StatCard(
+                            title = "Daily Streak",
+                            value = "${uiState.dailyStreak} Days",
+                            icon = Icons.Outlined.CalendarMonth,
+                            tint = Color(0xFFF97316),
+                            theme = theme,
+                            modifier = Modifier.weight(1f)
+                        )
+                        StatCard(
+                            title = "Power-Ups Used",
+                            value = "${uiState.totalPowerUpsUsed}",
+                            icon = Icons.Outlined.AutoAwesome,
+                            tint = Color(0xFFA855F7),
+                            theme = theme,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                Button(
+                    onClick = onDismiss,
+                    colors = ButtonDefaults.buttonColors(containerColor = theme.headerGold),
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp)
+                ) {
+                    Text("Close", color = Color.White, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun StatCard(
+    title: String,
+    value: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    tint: Color,
+    theme: GameTheme,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        shape = RoundedCornerShape(14.dp),
+        color = theme.boardBackground,
+        modifier = modifier
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            horizontalAlignment = Alignment.Start
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(18.dp))
+                Text(title, fontSize = 11.sp, color = theme.textSecondary, fontWeight = FontWeight.Medium)
+            }
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(value, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = theme.textPrimary)
+        }
+    }
+}
+
+@Composable
+fun DailyChallengeDialog(
+    uiState: GameUiState,
+    onPlayDailyChallenge: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val theme = uiState.selectedTheme
+
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(containerColor = theme.cardBg),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+                .shadow(16.dp, RoundedCornerShape(24.dp))
+                .testTag("daily_challenge_dialog")
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Daily Challenge",
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = theme.headerGold
+                    )
+                    IconButton(onClick = onDismiss) {
+                        Icon(Icons.Outlined.Close, contentDescription = "Close", tint = theme.textSecondary)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = theme.boardBackground,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.CalendarMonth,
+                            contentDescription = null,
+                            tint = Color(0xFFF97316),
+                            modifier = Modifier.size(44.dp)
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "Streak: ${uiState.dailyStreak} Days in Flow",
+                            fontSize = 17.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = theme.textPrimary
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Complete today's curated maze to earn bonus drops and double star rewards!",
+                            fontSize = 12.sp,
+                            color = theme.textSecondary,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(18.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    DailyRewardPill(title = "Stars", value = "+3 ⭐", theme = theme)
+                    DailyRewardPill(title = "Snip Power", value = "+2 ✂️", theme = theme)
+                    DailyRewardPill(title = "Ghost Power", value = "+2 🔮", theme = theme)
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                Button(
+                    onClick = onPlayDailyChallenge,
+                    colors = ButtonDefaults.buttonColors(containerColor = theme.headerGold),
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(50.dp)
+                        .testTag("play_daily_button")
+                ) {
+                    Icon(Icons.Outlined.PlayArrow, contentDescription = null, tint = Color.White)
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Enter Daily Maze", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DailyRewardPill(title: String, value: String, theme: GameTheme) {
+    Surface(
+        shape = RoundedCornerShape(10.dp),
+        color = theme.boardBackground,
+        modifier = Modifier.padding(2.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(title, fontSize = 10.sp, color = theme.textSecondary)
+            Text(value, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = theme.textPrimary)
+        }
+    }
+}
+
+@Composable
+fun CosmeticStoreDialog(
+    uiState: GameUiState,
+    onSelectTheme: (GameTheme) -> Unit,
+    onSelectTrail: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val theme = uiState.selectedTheme
+    var selectedTab by remember { mutableIntStateOf(0) }
+
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(containerColor = theme.cardBg),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp)
+                .shadow(16.dp, RoundedCornerShape(24.dp))
+                .testTag("cosmetic_store_dialog")
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(20.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Cosmetic Studio",
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = theme.headerGold
+                    )
+                    IconButton(onClick = onDismiss) {
+                        Icon(Icons.Outlined.Close, contentDescription = "Close", tint = theme.textSecondary)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                TabRow(
+                    selectedTabIndex = selectedTab,
+                    containerColor = Color.Transparent,
+                    contentColor = theme.headerGold,
+                    indicator = { tabPositions ->
+                        TabRowDefaults.SecondaryIndicator(
+                            modifier = Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
+                            color = theme.headerGold
+                        )
+                    }
+                ) {
+                    Tab(
+                        selected = selectedTab == 0,
+                        onClick = { selectedTab = 0 },
+                        text = { Text("Color Themes", fontWeight = FontWeight.SemiBold) }
+                    )
+                    Tab(
+                        selected = selectedTab == 1,
+                        onClick = { selectedTab = 1 },
+                        text = { Text("Particle Trails", fontWeight = FontWeight.SemiBold) }
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                if (selectedTab == 0) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        GameThemes.allThemes.forEach { th ->
+                            val isSelected = th.id == uiState.selectedTheme.id
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = if (isSelected) theme.bannerBg else theme.boardBackground,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { onSelectTheme(th) }
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(24.dp)
+                                                .clip(CircleShape)
+                                                .background(th.arrowStroke)
+                                                .border(2.dp, th.boardBackground, CircleShape)
+                                        )
+                                        Column {
+                                            Text(th.displayName, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = theme.textPrimary)
+                                            Text(if (th.isDark) "Night Mode" else "Warm Light", fontSize = 11.sp, color = theme.textSecondary)
+                                        }
+                                    }
+
+                                    if (isSelected) {
+                                        Icon(Icons.Outlined.Check, contentDescription = "Active", tint = theme.headerGold)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    val trails = listOf(
+                        Triple("stardust", "Stardust Flow", "Soft crystalline shimmer trail"),
+                        Triple("sakura", "Zen Sakura", "Floating meditative flower petals"),
+                        Triple("cosmic_fire", "Cosmic Plasma", "Electric futuristic particle burst"),
+                        Triple("hydro", "Hydro Ripples", "Calming aquatic water ripples")
+                    )
+
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        trails.forEach { (id, name, desc) ->
+                            val isSelected = id == uiState.selectedParticleTrail
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = if (isSelected) theme.bannerBg else theme.boardBackground,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { onSelectTrail(id) }
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column {
+                                        Text(name, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = theme.textPrimary)
+                                        Text(desc, fontSize = 11.sp, color = theme.textSecondary)
+                                    }
+
+                                    if (isSelected) {
+                                        Icon(Icons.Outlined.Check, contentDescription = "Equipped", tint = theme.headerGold)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                Button(
+                    onClick = onDismiss,
+                    colors = ButtonDefaults.buttonColors(containerColor = theme.headerGold),
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp)
+                ) {
+                    Text("Done", color = Color.White, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun VipRewardsDialog(
+    uiState: GameUiState,
+    onDismiss: () -> Unit
+) {
+    val theme = uiState.selectedTheme
+    val totalStars = uiState.totalStars
+
+    val milestones = listOf(
+        Pair(3, "Bronze Mind (3 ⭐): Free +3 Hints"),
+        Pair(10, "Silver Clarity (10 ⭐): Snip & Ghost Power"),
+        Pair(25, "Golden Flow (25 ⭐): Cyber Neon Theme"),
+        Pair(50, "Zen Master (50 ⭐): Infinite Zen Mode"),
+        Pair(100, "Cosmic Enlightenment (100 ⭐): Master Title")
+    )
+
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(containerColor = theme.cardBg),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+                .shadow(16.dp, RoundedCornerShape(24.dp))
+                .testTag("vip_rewards_dialog")
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Star Milestones & VIP",
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = theme.headerGold
+                    )
+                    IconButton(onClick = onDismiss) {
+                        Icon(Icons.Outlined.Close, contentDescription = "Close", tint = theme.textSecondary)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Text(
+                    text = "You have collected $totalStars Stars across all mazes.",
+                    fontSize = 13.sp,
+                    color = theme.textSecondary,
+                    textAlign = TextAlign.Center
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    milestones.forEach { (starsReq, desc) ->
+                        val isUnlocked = totalStars >= starsReq
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = if (isUnlocked) theme.bannerBg else theme.boardBackground,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                Icon(
+                                    imageVector = if (isUnlocked) Icons.Filled.Star else Icons.Outlined.Lock,
+                                    contentDescription = null,
+                                    tint = if (isUnlocked) Color(0xFFFBBF24) else theme.textSecondary,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Text(
+                                    text = desc,
+                                    fontSize = 12.sp,
+                                    fontWeight = if (isUnlocked) FontWeight.Bold else FontWeight.Normal,
+                                    color = if (isUnlocked) theme.textPrimary else theme.textSecondary
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                Button(
+                    onClick = onDismiss,
+                    colors = ButtonDefaults.buttonColors(containerColor = theme.headerGold),
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp)
+                ) {
+                    Text("Close", color = Color.White, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun AboutInfoDialog(
+    uiState: GameUiState,
+    onDismiss: () -> Unit
+) {
+    val theme = uiState.selectedTheme
+
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(containerColor = theme.cardBg),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+                .shadow(16.dp, RoundedCornerShape(24.dp))
+                .testTag("about_dialog")
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "Amaze Go • Arrow Escape",
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = theme.headerGold
+                )
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                Text(
+                    text = "v1.0.0 • Offline Ready Zen Experience",
+                    fontSize = 12.sp,
+                    color = theme.textSecondary
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Surface(
+                    shape = RoundedCornerShape(14.dp),
+                    color = theme.boardBackground,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text("• Tap any arrow to launch it into motion along its direction.", fontSize = 12.sp, color = theme.textPrimary)
+                        Text("• Long press on an arrow to view its forward trajectory guide.", fontSize = 12.sp, color = theme.textPrimary)
+                        Text("• Use free Snip, Ghost, Magnet, and Recall power-ups when blocked.", fontSize = 12.sp, color = theme.textPrimary)
+                        Text("• All puzzles are 100% playable offline anytime.", fontSize = 12.sp, color = theme.textPrimary)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                Button(
+                    onClick = onDismiss,
+                    colors = ButtonDefaults.buttonColors(containerColor = theme.headerGold),
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp)
+                ) {
+                    Text("Got It", color = Color.White, fontWeight = FontWeight.Bold)
                 }
             }
         }

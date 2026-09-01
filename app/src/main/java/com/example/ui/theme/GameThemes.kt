@@ -114,11 +114,57 @@ object GameThemes {
         isDark = false
     )
 
+    val CyberNeon = GameTheme(
+        id = "cyber_neon",
+        displayName = "Cyber Neon",
+        background = Color(0xFF0B0F19),
+        boardBackground = Color(0xFF151C2C),
+        arrowStroke = Color(0xFF38BDF8),
+        arrowHeadColor = Color(0xFF38BDF8),
+        hintColor = Color(0xFFF43F5E),
+        errorColor = Color(0xFFEF4444),
+        dropActiveColor = Color(0xFF06B6D4),
+        dropInactiveColor = Color(0xFF334155),
+        headerGold = Color(0xFFFBBF24),
+        textPrimary = Color(0xFFF8FAFC),
+        textSecondary = Color(0xFF94A3B8),
+        bannerBg = Color(0xFF1E293B),
+        bannerBorder = Color(0xFF334155),
+        bannerText = Color(0xFF38BDF8),
+        cardBg = Color(0xFF151C2C),
+        buttonBg = Color(0xFF222F46),
+        isDark = true
+    )
+
+    val SolarSunset = GameTheme(
+        id = "solar_sunset",
+        displayName = "Solar Sunset",
+        background = Color(0xFFFFF7ED),
+        boardBackground = Color(0xFFFFEDD5),
+        arrowStroke = Color(0xFF9A3412),
+        arrowHeadColor = Color(0xFF9A3412),
+        hintColor = Color(0xFFD97706),
+        errorColor = Color(0xFFDC2626),
+        dropActiveColor = Color(0xFFF97316),
+        dropInactiveColor = Color(0xFFFED7AA),
+        headerGold = Color(0xFFEA580C),
+        textPrimary = Color(0xFF431407),
+        textSecondary = Color(0xFF9A3412),
+        bannerBg = Color(0xFFFFEDD5),
+        bannerBorder = Color(0xFFFDBA74),
+        bannerText = Color(0xFF9A3412),
+        cardBg = Color(0xFFFFFFFF),
+        buttonBg = Color(0xFFFFFFFF),
+        isDark = false
+    )
+
     val allThemes = listOf(
         EyeComfort,
         ZenNight,
+        CyberNeon,
         MatchaMoss,
         CherryBlossom,
-        OceanBreeze
+        OceanBreeze,
+        SolarSunset
     )
 }
