@@ -323,7 +323,7 @@ fun MainHomeScreen(
                 Spacer(modifier = Modifier.height(6.dp))
 
                 Text(
-                    text = "Navigate city maze grids • Beta Early Access",
+                    text = "Navigate city maze grids • Beta Early Access • v1.1",
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Medium,
                     color = theme.textSecondary,

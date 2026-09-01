@@ -1,6 +1,8 @@
 package com.example.engine
 
 import com.example.model.ArrowItem
+import com.example.model.CityConfig
+import com.example.model.CityRepository
 import com.example.model.Direction
 import com.example.model.GridPoint
 import com.example.model.LevelData
@@ -8,574 +10,209 @@ import java.util.Random
 
 object ProceduralGenerator {
 
+    private const val GENERATION_VERSION = 2L
+
     /**
-     * Generates a guaranteed-solvable level based on level number and seed.
+     * Generates a deterministic, guaranteed-solvable level based on level number and city config.
      */
     fun generateLevel(levelNumber: Int): LevelData {
-        val random = Random(levelNumber.toLong() * 31337L + 7919L)
+        val city = CityRepository.getCityForLevel(levelNumber)
+        val routeInCity = CityRepository.getRouteNumberInCity(levelNumber)
+        val seed = (GENERATION_VERSION * 1000003L + city.id.toLong() * 65537L + levelNumber.toLong() * 31337L + 7919L)
 
-        // Check if there is a procedural silhouette mask for this milestone
-        val silhouetteMask = getSilhouetteMask(levelNumber)
-        
-        val (width, height, targetArrows) = if (silhouetteMask != null) {
-            Triple(silhouetteMask.width, silhouetteMask.height, silhouetteMask.targetArrows)
-        } else {
-            when {
-                levelNumber <= 3 -> Triple(6, 6, 4 + levelNumber)
-                levelNumber <= 10 -> Triple(8, 8, 7 + (levelNumber - 3))
-                levelNumber <= 25 -> Triple(10, 10, 12 + (levelNumber % 6))
-                levelNumber <= 50 -> Triple(12, 12, 16 + (levelNumber % 8))
-                levelNumber <= 100 -> Triple(14, 14, 20 + (levelNumber % 10))
-                levelNumber <= 200 -> Triple(15, 15, 24 + (levelNumber % 12).coerceAtMost(16))
-                else -> Triple(16, 16, 26 + (levelNumber % 14).coerceAtMost(20))
-            }
-        }
+        val progress = (routeInCity - 1).toFloat() / 19f
+        val width = city.gridWidthRange.first + ((city.gridWidthRange.last - city.gridWidthRange.first) * progress).toInt()
+        val height = city.gridHeightRange.first + ((city.gridHeightRange.last - city.gridHeightRange.first) * progress).toInt()
+        val targetArrows = city.arrowCountRange.first + ((city.arrowCountRange.last - city.arrowCountRange.first) * progress).toInt()
 
         var arrows: List<ArrowItem> = emptyList()
         var attempts = 0
+        val maxAttempts = 50
 
-        while (attempts < 6) {
-            val iterRandom = Random(levelNumber.toLong() * 31337L + 7919L + attempts * 10007L)
-            val candidateArrows = if (silhouetteMask != null && attempts < 2) {
-                generateMaskedArrowSet(silhouetteMask, iterRandom)
-            } else {
-                generateSolvableArrowSet(width, height, targetArrows, iterRandom)
+        while (attempts < maxAttempts) {
+            val iterSeed = seed + attempts * 10007L
+            val iterRandom = java.util.Random(iterSeed)
+
+            val candidate = generateCityConstrainedArrowSet(
+                city = city,
+                gridWidth = width,
+                gridHeight = height,
+                targetCount = targetArrows,
+                random = iterRandom
+            )
+
+            if (candidate.isNotEmpty() && validateArrowSet(candidate, width, height)) {
+                val metrics = PuzzleSolver.analyzePuzzle(candidate, width, height)
+                
+                // Difficulty and quality checks
+                if (metrics.solvable && metrics.dependencyDepth >= 1 && metrics.initiallyUnblocked > 0) {
+                    arrows = candidate
+                    break
+                }
             }
+            attempts++
+        }
 
-            if (candidateArrows.isNotEmpty() && validateArrowSet(candidateArrows, width, height)) {
-                arrows = candidateArrows
+        if (arrows.isEmpty() || !PuzzleSolver.analyzePuzzle(arrows, width, height).solvable) {
+            val fallback = generateDeterministicCityFallback(city, levelNumber, width, height, targetArrows)
+            val fallbackMetrics = PuzzleSolver.analyzePuzzle(fallback, width, height)
+            if (fallbackMetrics.solvable) {
+                arrows = fallback
+            } else {
+                // If even fallback fails (which it shouldn't, but for safety), use a known safe curated level
+                arrows = CuratedLevels.curatedMap[1]?.arrows ?: emptyList()
+                android.util.Log.e("ProceduralGenerator", "Generation failure for Level $levelNumber in City ${city.id}. Attempted $attempts times. Falling back to Level 1.")
+            }
+        }
+
+        val levelTitle = generateRouteTitle(city, routeInCity, levelNumber)
+        val bannerText = generateBannerText(city, routeInCity)
+
+        return LevelData(
+            levelNumber = levelNumber,
+            title = levelTitle,
+            bannerText = bannerText,
+            gridWidth = width,
+            gridHeight = height,
+            arrows = arrows,
+            maxDrops = 3
+        )
+    }
+
+    /**
+     * Generates a high-density, guaranteed-solvable anchor / silhouette level for city milestones.
+     */
+    fun generateAnchorLevel(levelNumber: Int): LevelData {
+        val city = CityRepository.getCityForLevel(levelNumber)
+        val routeInCity = CityRepository.getRouteNumberInCity(levelNumber)
+        val silhouette = LevelRepository.silhouetteLevels.find { it.levelNumber == levelNumber }
+        val seed = (GENERATION_VERSION * 2000003L + city.id.toLong() * 99991L + levelNumber.toLong() * 65537L + 1234567L)
+        val random = Random(seed)
+
+        val width = city.gridWidthRange.last
+        val height = city.gridHeightRange.last
+        val targetArrows = city.arrowCountRange.last
+
+        var arrows: List<ArrowItem> = emptyList()
+        var attempts = 0
+        val maxAttempts = 12
+
+        while (attempts < maxAttempts) {
+            val iterSeed = seed + attempts * 10007L
+            val iterRandom = Random(iterSeed)
+
+            val candidate = generateCityConstrainedArrowSet(
+                city = city,
+                gridWidth = width,
+                gridHeight = height,
+                targetCount = targetArrows,
+                random = iterRandom
+            )
+
+            if (candidate.isNotEmpty() && validateArrowSet(candidate, width, height)) {
+                arrows = candidate
                 break
             }
             attempts++
         }
 
         if (arrows.isEmpty() || !validateArrowSet(arrows, width, height)) {
-            arrows = generateDeterministicFallback(levelNumber, width, height, targetArrows)
+            arrows = generateDeterministicCityFallback(city, levelNumber, width, height, targetArrows)
         }
 
-        val bannerWords = listOf(
-            "EYE COMFORT",
-            "TAP TO CLEAR",
-            "CALM MIND",
-            "QUIET FLOW",
-            "BETTER SLEEP",
-            "CHALLENGE ON",
-            "FOCUS & UNTANGLE",
-            "BREATHE DEEP",
-            "MIND AT EASE"
-        )
-        val banner = if (silhouetteMask != null) {
-            silhouetteMask.banner
-        } else {
-            bannerWords[(levelNumber - 1) % bannerWords.size]
-        }
+        val icon = silhouette?.icon ?: city.icon
+        val specificTitle = silhouette?.title ?: "Anchor Route $routeInCity"
+        val levelTitle = "City ${city.id} • Route $routeInCity • $specificTitle $icon"
+        val bannerText = silhouette?.title?.uppercase() ?: generateBannerText(city, routeInCity)
 
         return LevelData(
             levelNumber = levelNumber,
-            title = if (silhouetteMask != null) "Level $levelNumber • ${silhouetteMask.title}" else "Level $levelNumber",
+            title = levelTitle,
             gridWidth = width,
             gridHeight = height,
             arrows = arrows,
-            maxDrops = if (targetArrows > 15) 5 else 3,
-            isSilhouette = silhouetteMask != null,
-            silhouetteIcon = silhouetteMask?.icon ?: "🧩",
-            bannerText = banner
+            maxDrops = if (targetArrows >= 18) 5 else if (targetArrows >= 12) 4 else 3,
+            isSilhouette = true,
+            silhouetteIcon = icon,
+            bannerText = bannerText
         )
     }
 
-    data class SilhouetteConfig(
-        val title: String,
-        val icon: String,
-        val width: Int,
-        val height: Int,
-        val targetArrows: Int,
-        val banner: String,
-        val maskPattern: List<String>
-    )
+    private fun generateRouteTitle(city: CityConfig, routeInCity: Int, levelNumber: Int): String {
+        val titlesMap = mapOf(
+            1 to listOf("First Steps", "Gentle Turn", "Quiet Path", "Inner Calm", "Zen Flow", "Twin Streams", "Breeze", "Clear Vision", "Stone Garden", "Trophy of Clarity", "Harmony", "Bamboo Lane", "Lantern Walk", "Lotus Pond", "Diamond Heart", "Morning Mist", "Silent Gate", "Purity", "Serenity", "Zendai Gate"),
+            2 to listOf("First Wind", "Dune Horizon", "Golden Dust", "Sand Drift", "Dune Run", "Oasis Trace", "Sun Flare", "Desert Ridge", "Mirage Walk", "Wind Sweep", "Canyon Way", "Nomad Track", "Sunstone", "Dust Devil", "Playful Kitty", "Heat Haze", "Scorpion Pass", "Red Sands", "Sirocco", "Loyal Companion"),
+            3 to listOf("Shallow Tide", "Coral Branch", "Ocean Drift", "Sea Ripple", "First Wave", "Harbor Light", "Azure Stream", "Currents", "Whirlpool", "Swimming Koi", "Deep Trench", "Reef Run", "Lagoon Bend", "Sailor's Path", "Tidal Fork", "Aquatic Maze", "Storm Surge", "Abyssal Wake", "Pearl Drift", "The Tide"),
+            4 to listOf("Sprout", "Mossy Path", "Willow Branch", "Green Canopy", "Ancient Roots", "Timber Line", "Fern Grove", "Bark & Bough", "Forest Clearing", "Forest Canopy", "Bramble Maze", "Pine Needle", "Woodland Trail", "Deep Thicket", "Soaring Falcon", "River Crossing", "Elder Tree", "Emerald Grove", "Verdant Spire", "Warm Coffee"),
+            5 to listOf("Spark", "Ash Field", "Cinder Trail", "Smoldering Way", "Ember Trail", "Basalt Path", "Lava Stream", "Furnace Run", "Sulfur Vent", "Origami Swan", "Pyroclast", "Igneous Maze", "Obsidian Spire", "Magma Tunnel", "Volcanic Core", "Heat Chamber", "Rift Valley", "Crater Edge", "Blazing Spiral", "The Volcano"),
+            6 to listOf("Updraft", "Breeze Crest", "Zephyr Lane", "Stratus Walk", "Aerith Lift", "Cumulus Path", "Vapor Trail", "Floating Isle", "Cirrus Flow", "Sky Bridge", "Nimbus Gate", "Thermal Drift", "Skyline Maze", "Aurora View", "Cloud Garden", "Solar Sail", "High Altitude", "Wing Spire", "Aether Vortex", "Sacred Lotus"),
+            7 to listOf("Quartz Shard", "Facet Lane", "Geode Trace", "Lustrous Way", "Crystal Path", "Specular Bend", "Prism Edge", "Reflecting Pool", "Glinting Spire", "Mirror Prism", "Diamond Matrix", "Beryl Corridor", "Sapphire Run", "Emerald Facet", "Prismatic Spire", "Resonance Chamber", "Starlight Crystal", "Chime Maze", "Crystalline Web", "The Crystal Core"),
+            8 to listOf("Cog Tooth", "Axle Turn", "Camshaft Run", "Ratchet Lane", "Piston Drive", "Conveyor Line", "Sprocket Walk", "Steam Valve", "Clockwork Ring", "Compass Star", "Flywheel Path", "Hydraulic Gate", "Gimbal Trace", "Turret Maze", "Interlock Gear", "Pressure Tube", "Mainspring Run", "Escapement", "Chronometer", "The Grand Gear"),
+            9 to listOf("Dawn Ray", "Gleam", "Beaming Path", "Luminous Lane", "First Light", "Halo Ring", "Prism Beam", "Spectral Trace", "Strobe Flow", "Solar Radiance", "Photon Gate", "Corona Way", "Incandescent Maze", "Glow Arbor", "Light Tree", "Solar Flare", "Laser Corridor", "Lustre Chamber", "Bioluminescence", "Crescent Moon"),
+            10 to listOf("Mobius Path", "Ouroboros", "Vortex Walk", "Singularity", "Infinity Loop", "Tesseract", "Continuum", "Recursion", "Fractal Gate", "Time Maze", "Dimension Bend", "Temporal Flow", "Quantum Trace", "Chronos Loop", "Eternal Flow", "Event Horizon", "Cosmic Spiral", "Hypercube", "Omniverse", "The Infinity Maze")
+        )
 
-    private fun getSilhouetteMask(levelNumber: Int): SilhouetteConfig? {
-        return when (levelNumber) {
-            15 -> SilhouetteConfig(
-                title = "Diamond Heart 💎",
-                icon = "💎",
-                width = 13,
-                height = 13,
-                targetArrows = 14,
-                banner = "DIAMOND HEART",
-                maskPattern = listOf(
-                    "..XXXX.XXXX..",
-                    ".XXXXXXXXXXX.",
-                    "XXXXXXXXXXXXX",
-                    "XXXXXXXXXXXXX",
-                    ".XXXXXXXXXXX.",
-                    "..XXXXXXXXX..",
-                    "...XXXXXXX...",
-                    "....XXXXX....",
-                    ".....XXX.....",
-                    "......X......"
-                )
-            )
-            20 -> SilhouetteConfig(
-                title = "Imperial Crown 👑",
-                icon = "👑",
-                width = 13,
-                height = 12,
-                targetArrows = 15,
-                banner = "ROYAL CROWN",
-                maskPattern = listOf(
-                    "X.....X.....X",
-                    "XX...XXX...XX",
-                    "XXX.XXXXX.XXX",
-                    "XXXXXXXXXXXXX",
-                    "XXXXXXXXXXXXX",
-                    ".XXXXXXXXXXX.",
-                    "..XXXXXXXXX..",
-                    "XXXXXXXXXXXXX"
-                )
-            )
-            35 -> SilhouetteConfig(
-                title = "Playful Kitty 🐱",
-                icon = "🐱",
-                width = 14,
-                height = 14,
-                targetArrows = 16,
-                banner = "PLAYFUL KITTY",
-                maskPattern = listOf(
-                    "XX........XX.",
-                    "XXX......XXX.",
-                    "XXXXXXXXXXXX.",
-                    "XXXXXXXXXXXX.",
-                    ".XXXXXXXXXX..",
-                    "..XXXXXXXX...",
-                    "....XXXXXX...",
-                    "...XXXXXXXX..",
-                    "..XXXXXXXXXX.",
-                    "..XXXXXXXXXX.",
-                    "..XX.XXXX.XX.",
-                    "..XX......XX."
-                )
-            )
-            50 -> SilhouetteConfig(
-                title = "Bonsai Tree 🌲",
-                icon = "🌲",
-                width = 14,
-                height = 14,
-                targetArrows = 18,
-                banner = "BONSAI CALM",
-                maskPattern = listOf(
-                    "....XXXX....",
-                    "...XXXXXX...",
-                    "..XXXXXXXX..",
-                    ".XXXXXXXXXX.",
-                    "..XXXXXXXX..",
-                    "...XXXXXX...",
-                    ".....XX.....",
-                    ".....XX.....",
-                    "....XXXX....",
-                    "...XXXXXX..."
-                )
-            )
-            60 -> SilhouetteConfig(
-                title = "Koi Fish 🐟",
-                icon = "🐟",
-                width = 14,
-                height = 14,
-                targetArrows = 18,
-                banner = "SWIMMING KOI",
-                maskPattern = listOf(
-                    ".....XXXX....",
-                    "...XXXXXXXX..",
-                    "..XXXXXXXXXX.",
-                    ".XXXXXXXXXXX.",
-                    "XXXXXXXXXXXXX",
-                    ".XXXXXXXXXXX.",
-                    "..XXXXXXXXXX.",
-                    "...XXXXXXXX..",
-                    ".....XXXX....",
-                    "....XX..XX...",
-                    "...XXX..XXX.."
-                )
-            )
-            75 -> SilhouetteConfig(
-                title = "Soaring Falcon 🦅",
-                icon = "🦅",
-                width = 15,
-                height = 14,
-                targetArrows = 20,
-                banner = "SOARING FALCON",
-                maskPattern = listOf(
-                    "X.............X",
-                    "XX...........XX",
-                    "XXX...XXX...XXX",
-                    "XXXX.XXXXX.XXXX",
-                    "XXXXXXXXXXXXXXX",
-                    ".XXXXXXXXXXXXX.",
-                    "..XXXXXXXXXXX..",
-                    "....XXXXXXX....",
-                    "......XXX......",
-                    ".......X......."
-                )
-            )
-            80 -> SilhouetteConfig(
-                title = "Warm Coffee ☕",
-                icon = "☕",
-                width = 14,
-                height = 14,
-                targetArrows = 16,
-                banner = "WARM COFFEE",
-                maskPattern = listOf(
-                    "...X..X..X...",
-                    "...X..X..X...",
-                    "XXXXXXXXXXXX.",
-                    "XXXXXXXXXXXXX",
-                    "XXXXXXXXXXXXX",
-                    "XXXXXXXXXXXXX",
-                    ".XXXXXXXXXXX.",
-                    "..XXXXXXXXX..",
-                    "....XXXXX....",
-                    "...XXXXXXX..."
-                )
-            )
-            120 -> SilhouetteConfig(
-                title = "Sacred Lotus 🌸",
-                icon = "🌸",
-                width = 15,
-                height = 14,
-                targetArrows = 22,
-                banner = "SACRED LOTUS",
-                maskPattern = listOf(
-                    ".......X.......",
-                    "......XXX......",
-                    ".....XXXXX.....",
-                    "...XXXXXXXXX...",
-                    "..XXXXXXXXXXX..",
-                    ".XXXXXXXXXXXXX.",
-                    "XXXXXXXXXXXXXXX",
-                    ".XXXXXXXXXXXXX.",
-                    "...XXXXXXXXX..."
-                )
-            )
-            150 -> SilhouetteConfig(
-                title = "Compass Star 🧭",
-                icon = "🧭",
-                width = 15,
-                height = 15,
-                targetArrows = 22,
-                banner = "COMPASS STAR",
-                maskPattern = listOf(
-                    ".......X.......",
-                    "......XXX......",
-                    ".....XXXXX.....",
-                    "....XXXXXXX....",
-                    "XXXXXXXXXXXXXXX",
-                    ".XXXXXXXXXXXXX.",
-                    "..XXXXXXXXXXX..",
-                    "...XXXXXXXXX...",
-                    "....XXXXXXX....",
-                    ".....XXXXX.....",
-                    "......XXX......",
-                    ".......X......."
-                )
-            )
-            90 -> SilhouetteConfig(
-                title = "Origami Swan 🦢",
-                icon = "🦢",
-                width = 15,
-                height = 14,
-                targetArrows = 20,
-                banner = "ORIGAMI SWAN",
-                maskPattern = listOf(
-                    ".......XX......",
-                    "......XXXX.....",
-                    ".....XX..XX....",
-                    "....XX....X....",
-                    "...XX..........",
-                    "..XXXXXXXXXXX..",
-                    ".XXXXXXXXXXXXX.",
-                    "XXXXXXXXXXXXXXX",
-                    ".XXXXXXXXXXXX..",
-                    "..XXXXXXXXXX...",
-                    "...XXXXXXXX...."
-                )
-            )
-            180 -> SilhouetteConfig(
-                title = "Crescent Moon 🌙",
-                icon = "🌙",
-                width = 15,
-                height = 15,
-                targetArrows = 22,
-                banner = "CRESCENT MOON",
-                maskPattern = listOf(
-                    ".....XXXXX.....",
-                    "...XXXXXXXX....",
-                    "..XXXXX........",
-                    ".XXXXX.........",
-                    "XXXXX..........",
-                    "XXXXX..........",
-                    "XXXXX..........",
-                    "XXXXX..........",
-                    ".XXXXX.........",
-                    "..XXXXX........",
-                    "...XXXXXXXX....",
-                    ".....XXXXX....."
-                )
-            )
-            250 -> SilhouetteConfig(
-                title = "Phoenix Ascending 🔥",
-                icon = "🔥",
-                width = 16,
-                height = 16,
-                targetArrows = 26,
-                banner = "PHOENIX ASCENT",
-                maskPattern = listOf(
-                    ".......XX.......",
-                    "......XXXX......",
-                    "X....XXXXXX....X",
-                    "XX..XXXXXXXX..XX",
-                    "XXX.XXXXXXXX.XXX",
-                    "XXXXXXXXXXXXXXXX",
-                    ".XXXXXXXXXXXXXX.",
-                    "..XXXXXXXXXXXX..",
-                    "...XXXXXXXXXX...",
-                    "....XXXXXXXX....",
-                    ".....XXXXXX.....",
-                    "......XXXX......",
-                    ".......XX.......",
-                    "......XXXX......",
-                    ".....XX..XX....."
-                )
-            )
-            300 -> SilhouetteConfig(
-                title = "Mythic Dragon 🐉",
-                icon = "🐉",
-                width = 16,
-                height = 16,
-                targetArrows = 28,
-                banner = "MYTHIC DRAGON",
-                maskPattern = listOf(
-                    "...XXXXX........",
-                    "..XXXXXXX.......",
-                    ".XXXXXXXX.......",
-                    "...XXXXXXX......",
-                    "....XXXXXXXX....",
-                    ".....XXXXXXXX...",
-                    "......XXXXXXXX..",
-                    "..XX...XXXXXXXX.",
-                    ".XXXX...XXXXXXXX",
-                    "XXXXX....XXXXXXX",
-                    ".XXXXX....XXXXX.",
-                    "..XXXXX...XXXX..",
-                    "...XXXXXXXXXXX..",
-                    "....XXXXXXXXX...",
-                    ".....XXXXXXX...."
-                )
-            )
-            500 -> SilhouetteConfig(
-                title = "Celestial Castle 🏰",
-                icon = "🏰",
-                width = 16,
-                height = 16,
-                targetArrows = 30,
-                banner = "STAR CITADEL",
-                maskPattern = listOf(
-                    "X..X..XXXX..X..X",
-                    "X..X..XXXX..X..X",
-                    "XXXX..XXXX..XXXX",
-                    "XXXXXXXXXXXXXXXX",
-                    "XXXXXXXXXXXXXXXX",
-                    ".XXXXXXXXXXXXXX.",
-                    ".XXXXXXXXXXXXXX.",
-                    "XXXXXXXXXXXXXXXX",
-                    "XXXXXX....XXXXXX",
-                    "XXXXXX....XXXXXX",
-                    "XXXXXXXXXXXXXXXX",
-                    "XXXXXXXXXXXXXXXX"
-                )
-            )
-            else -> null
+        val cityTitles = titlesMap[city.id]
+        val specificTitle = if (cityTitles != null && routeInCity in 1..cityTitles.size) {
+            cityTitles[routeInCity - 1]
+        } else {
+            "Route $routeInCity"
         }
+
+        return "City ${city.id} • Route $routeInCity • $specificTitle"
     }
 
-    private fun generateMaskedArrowSet(
-        config: SilhouetteConfig,
-        random: Random
-    ): List<ArrowItem> {
-        val validCells = mutableSetOf<GridPoint>()
-        for (y in config.maskPattern.indices) {
-            val line = config.maskPattern[y]
-            for (x in line.indices) {
-                if (line[x] == 'X') {
-                    validCells.add(GridPoint(x + 1, y + 1))
-                }
-            }
-        }
-
-        val occupiedCells = mutableSetOf<GridPoint>()
-        val arrows = mutableListOf<ArrowItem>()
-        val directions = listOf(Direction.UP, Direction.DOWN, Direction.LEFT, Direction.RIGHT)
-        var attempts = 0
-        var arrowId = 1
-
-        while (arrows.size < config.targetArrows && attempts < 400) {
-            attempts++
-            val exitDir = directions[random.nextInt(directions.size)]
-
-            // Pick head in valid silhouette area that has clear exit
-            val headCandidate = pickClearMaskedHead(
-                config.width,
-                config.height,
-                exitDir,
-                validCells,
-                occupiedCells,
-                random
-            ) ?: continue
-
-            val waypoints = buildBackwardPathWithinMask(
-                headCandidate,
-                exitDir,
-                config.width,
-                config.height,
-                validCells,
-                occupiedCells,
-                random
-            )
-
-            if (waypoints.size < 2) continue
-
-            val arrowPoints = waypoints.reversed()
-            val newArrow = ArrowItem(
-                id = arrowId++,
-                points = arrowPoints,
-                headDirection = exitDir,
-                colorIndex = arrows.size % 4
-            )
-
-            occupiedCells.addAll(newArrow.allOccupiedCells())
-            arrows.add(newArrow)
-        }
-
-        if (arrows.isEmpty()) {
-            return generateSolvableArrowSet(config.width, config.height, config.targetArrows, random)
-        }
-
-        return arrows.mapIndexed { index, arrow -> arrow.copy(id = index + 1) }
+    private fun generateBannerText(city: CityConfig, routeInCity: Int): String {
+        val banners = listOf(
+            "TAP TO CLEAR",
+            "EYE COMFORT",
+            "CALM MIND",
+            "QUIET FLOW",
+            "BREATHE DEEP",
+            "FOCUS & UNTANGLE",
+            "MIND AT EASE",
+            "BETTER SLEEP"
+        )
+        return banners[(city.id * 7 + routeInCity) % banners.size]
     }
 
-    private fun pickClearMaskedHead(
+    private fun generateCityConstrainedArrowSet(
+        city: CityConfig,
         gridWidth: Int,
         gridHeight: Int,
-        exitDir: Direction,
-        validCells: Set<GridPoint>,
-        occupiedCells: Set<GridPoint>,
-        random: Random
-    ): GridPoint? {
-        val candidates = mutableListOf<GridPoint>()
-        for (pt in validCells) {
-            if (pt in occupiedCells) continue
-
-            var ray = pt.plus(exitDir)
-            var clear = true
-            while (ray.x in 0 until gridWidth && ray.y in 0 until gridHeight) {
-                if (ray in occupiedCells) {
-                    clear = false
-                    break
-                }
-                ray = ray.plus(exitDir)
-            }
-            if (clear) candidates.add(pt)
-        }
-        return if (candidates.isNotEmpty()) candidates[random.nextInt(candidates.size)] else null
-    }
-
-    private fun buildBackwardPathWithinMask(
-        head: GridPoint,
-        exitDir: Direction,
-        gridWidth: Int,
-        gridHeight: Int,
-        validCells: Set<GridPoint>,
-        occupiedCells: Set<GridPoint>,
-        random: Random
-    ): List<GridPoint> {
-        val pathWaypoints = mutableListOf<GridPoint>()
-        pathWaypoints.add(head)
-
-        val localOccupied = occupiedCells.toMutableSet()
-        localOccupied.add(head)
-
-        val backwardDir = when (exitDir) {
-            Direction.UP -> Direction.DOWN
-            Direction.DOWN -> Direction.UP
-            Direction.LEFT -> Direction.RIGHT
-            Direction.RIGHT -> Direction.LEFT
-        }
-
-        val firstLen = 1 + random.nextInt(3)
-        var current = head
-        for (i in 0 until firstLen) {
-            val next = current.plus(backwardDir)
-            if (next !in validCells || next in localOccupied) break
-            current = next
-            localOccupied.add(current)
-        }
-
-        if (current == head) return emptyList()
-        pathWaypoints.add(current)
-
-        val numTurns = 1 + random.nextInt(2)
-        var lastDir = backwardDir
-
-        for (t in 0 until numTurns) {
-            val turnDirs = if (lastDir == Direction.UP || lastDir == Direction.DOWN) {
-                listOf(Direction.LEFT, Direction.RIGHT)
-            } else {
-                listOf(Direction.UP, Direction.DOWN)
-            }
-            val turnDir = turnDirs[random.nextInt(turnDirs.size)]
-            val segLen = 1 + random.nextInt(3)
-
-            var segCurrent = current
-            for (step in 0 until segLen) {
-                val next = segCurrent.plus(turnDir)
-                if (next !in validCells || next in localOccupied) break
-                segCurrent = next
-                localOccupied.add(segCurrent)
-            }
-
-            if (segCurrent != current) {
-                current = segCurrent
-                pathWaypoints.add(current)
-                lastDir = turnDir
-            } else {
-                break
-            }
-        }
-
-        return pathWaypoints
-    }
-
-    private fun generateSolvableArrowSet(
-        gridWidth: Int,
-        gridHeight: Int,
-        count: Int,
+        targetCount: Int,
         random: Random
     ): List<ArrowItem> {
         val occupiedCells = mutableSetOf<GridPoint>()
         val arrows = mutableListOf<ArrowItem>()
-
         val directions = listOf(Direction.UP, Direction.DOWN, Direction.LEFT, Direction.RIGHT)
 
         var attempts = 0
         var arrowId = 1
 
-        while (arrows.size < count && attempts < 350) {
+        while (arrows.size < targetCount && attempts < 450) {
             attempts++
 
-            val exitDir = directions[random.nextInt(directions.size)]
+            // Apply direction preferences based on city profile
+            val exitDir = if (city.verticalPreference > 0f && random.nextFloat() < city.verticalPreference) {
+                if (random.nextBoolean()) Direction.UP else Direction.DOWN
+            } else {
+                directions[random.nextInt(directions.size)]
+            }
 
             val headCandidate = pickClearHead(gridWidth, gridHeight, exitDir, occupiedCells, random)
                 ?: continue
 
-            val waypoints = buildBackwardPath(headCandidate, exitDir, gridWidth, gridHeight, occupiedCells, random)
+            val waypoints = buildBackwardPathWithCityStyle(
+                city = city,
+                head = headCandidate,
+                exitDir = exitDir,
+                gridWidth = gridWidth,
+                gridHeight = gridHeight,
+                occupiedCells = occupiedCells,
+                random = random
+            )
+
             if (waypoints.size < 2) continue
 
             val arrowPoints = waypoints.reversed()
@@ -629,7 +266,8 @@ object ProceduralGenerator {
         return if (candidates.isNotEmpty()) candidates[random.nextInt(candidates.size)] else null
     }
 
-    private fun buildBackwardPath(
+    private fun buildBackwardPathWithCityStyle(
+        city: CityConfig,
         head: GridPoint,
         exitDir: Direction,
         gridWidth: Int,
@@ -650,7 +288,12 @@ object ProceduralGenerator {
             Direction.RIGHT -> Direction.LEFT
         }
 
-        val firstLen = 1 + random.nextInt(3)
+        val firstLen = if (city.longSweepPreference > 0f && random.nextFloat() < city.longSweepPreference) {
+            2 + random.nextInt(4)
+        } else {
+            1 + random.nextInt(3)
+        }
+
         var current = head
         for (i in 0 until firstLen) {
             val next = current.plus(backwardDir)
@@ -664,7 +307,8 @@ object ProceduralGenerator {
         if (current == head) return emptyList()
         pathWaypoints.add(current)
 
-        val numTurns = 1 + random.nextInt(3)
+        val maxTurns = city.maxTurnsRange.last.coerceAtLeast(1)
+        val numTurns = 1 + random.nextInt(maxTurns)
         var lastDir = backwardDir
 
         for (t in 0 until numTurns) {
@@ -674,7 +318,12 @@ object ProceduralGenerator {
                 listOf(Direction.UP, Direction.DOWN)
             }
             val turnDir = turnDirs[random.nextInt(turnDirs.size)]
-            val segLen = 1 + random.nextInt(4)
+
+            val segLen = if (city.longSweepPreference > 0f) {
+                2 + random.nextInt(4)
+            } else {
+                1 + random.nextInt(3)
+            }
 
             var segCurrent = current
             for (step in 0 until segLen) {
@@ -736,34 +385,39 @@ object ProceduralGenerator {
     }
 
     /**
-     * Produces a guaranteed geometrically valid and solvable deterministic fallback puzzle.
+     * Produces a guaranteed geometrically valid and solvable deterministic fallback puzzle tailored to the city.
      */
-    fun generateDeterministicFallback(
+    fun generateDeterministicCityFallback(
+        city: CityConfig,
         levelNumber: Int,
         gridWidth: Int,
         gridHeight: Int,
         targetCount: Int
     ): List<ArrowItem> {
         val arrows = mutableListOf<ArrowItem>()
-        val count = targetCount.coerceIn(3, (gridHeight / 2).coerceAtLeast(3))
+        val count = targetCount.coerceIn(3, (gridHeight - 2).coerceAtLeast(3))
         var id = 1
 
         for (i in 0 until count) {
-            val y = 1 + (i * 2)
-            if (y >= gridHeight - 1) break
-            val isEven = i % 2 == 0
+            val y = 1 + (i % (gridHeight - 2))
+            val isEven = (i + levelNumber) % 2 == 0
             val startX = if (isEven) 1 else gridWidth - 2
             val endX = if (isEven) gridWidth - 2 else 1
             val dir = if (isEven) Direction.RIGHT else Direction.LEFT
 
-            arrows.add(
-                ArrowItem(
-                    id = id++,
-                    points = listOf(GridPoint(startX, y), GridPoint(endX, y)),
-                    headDirection = dir,
-                    colorIndex = (id - 1) % 4
+            // Check if this horizontal line is already occupied
+            val lineCells = (minOf(startX, endX)..maxOf(startX, endX)).map { GridPoint(it, y) }
+            val existingCells = arrows.flatMap { it.allOccupiedCells() }.toSet()
+            if (lineCells.none { it in existingCells }) {
+                arrows.add(
+                    ArrowItem(
+                        id = id++,
+                        points = listOf(GridPoint(startX, y), GridPoint(endX, y)),
+                        headDirection = dir,
+                        colorIndex = (id - 1) % 4
+                    )
                 )
-            )
+            }
         }
 
         if (arrows.isEmpty()) {
@@ -775,9 +429,16 @@ object ProceduralGenerator {
                     colorIndex = 0
                 )
             )
+            arrows.add(
+                ArrowItem(
+                    id = 2,
+                    points = listOf(GridPoint(gridWidth - 2, 3), GridPoint(1, 3)),
+                    headDirection = Direction.LEFT,
+                    colorIndex = 1
+                )
+            )
         }
 
         return arrows
     }
 }
-

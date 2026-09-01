@@ -49,6 +49,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.model.CityRepository
 import com.example.model.GameTheme
 
 @Composable
@@ -64,15 +65,10 @@ fun GameTopBar(
     onSettingsClicked: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val setIndex = (levelNumber - 1) / 10
-    val sectorNumber = setIndex + 1
-    val nodeInSet = (levelNumber - 1) % 10 // 0 to 9
-    val sectorNames = listOf(
-        "Downtown Grid", "Neon District", "Cyber Hub", "Matrix Core",
-        "Aero Harbor", "Pulse Nexus", "Solar Boulevard", "Zenith Heights",
-        "Prism Alley", "Metropolis Apex"
-    )
-    val sectorName = sectorNames.getOrElse(setIndex % sectorNames.size) { "Sector $sectorNumber" }
+    val city = CityRepository.getCityForLevel(levelNumber)
+    val routeInCity = CityRepository.getRouteNumberInCity(levelNumber)
+    val totalRoutesInCity = city.totalRoutes
+    val nodeInSet = routeInCity - 1
 
     val infiniteTransition = rememberInfiniteTransition(label = "nodePulse")
     val pulseScale by infiniteTransition.animateFloat(
@@ -124,8 +120,8 @@ fun GameTopBar(
 
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
-                    text = "Level $levelNumber",
-                    fontSize = 20.sp,
+                    text = "${city.icon} ${city.name}",
+                    fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
                     color = theme.headerGold,
                     modifier = Modifier.testTag("level_title_text")
@@ -203,13 +199,13 @@ fun GameTopBar(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "$sectorName • Sector $sectorNumber",
+                    text = "${city.subtitle} • Route $routeInCity",
                     fontSize = 11.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = theme.textSecondary.copy(alpha = 0.8f)
                 )
                 Text(
-                    text = "${nodeInSet + 1}/10",
+                    text = "$routeInCity / $totalRoutesInCity",
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
                     color = theme.headerGold
@@ -218,16 +214,15 @@ fun GameTopBar(
 
             Spacer(modifier = Modifier.height(4.dp))
 
-            // Interconnected City Nodes Track
+            // Interconnected City Nodes Track (20 routes)
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(14.dp),
                 contentAlignment = Alignment.Center
             ) {
-                // Subtle background connecting track
                 val animatedProgress by animateFloatAsState(
-                    targetValue = (nodeInSet + 1) / 10f,
+                    targetValue = routeInCity.toFloat() / totalRoutesInCity.toFloat(),
                     animationSpec = tween(400, easing = FastOutSlowInEasing),
                     label = "trackProgress"
                 )
@@ -259,25 +254,26 @@ fun GameTopBar(
                     )
                 }
 
-                // 10 City Nodes Row
+                // 20 City Nodes Row
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    for (i in 0 until 10) {
+                    for (i in 0 until totalRoutesInCity) {
                         val isCompleted = i < nodeInSet
                         val isCurrent = i == nodeInSet
+                        val isAnchor = (i + 1) % 5 == 0
 
                         Box(
                             contentAlignment = Alignment.Center,
-                            modifier = Modifier.size(14.dp)
+                            modifier = Modifier.size(if (isAnchor) 14.dp else 10.dp)
                         ) {
                             if (isCurrent) {
                                 // Pulsing beacon ring
                                 Box(
                                     modifier = Modifier
-                                        .size(13.dp)
+                                        .size(if (isAnchor) 14.dp else 11.dp)
                                         .scale(pulseScale)
                                         .clip(CircleShape)
                                         .background(theme.headerGold.copy(alpha = 0.28f))
@@ -286,17 +282,24 @@ fun GameTopBar(
 
                             Box(
                                 modifier = Modifier
-                                    .size(if (isCurrent) 8.dp else 6.dp)
+                                    .size(
+                                        when {
+                                            isCurrent -> if (isAnchor) 8.dp else 6.dp
+                                            isAnchor -> 6.dp
+                                            else -> 4.dp
+                                        }
+                                    )
                                     .clip(CircleShape)
                                     .background(
                                         when {
                                             isCurrent -> theme.headerGold
                                             isCompleted -> theme.dropActiveColor
+                                            isAnchor -> theme.headerGold.copy(alpha = 0.5f)
                                             else -> theme.boardBackground
                                         }
                                     )
                                     .border(
-                                        width = if (isCurrent) 1.5.dp else 1.dp,
+                                        width = if (isCurrent) 1.5.dp else 0.8.dp,
                                         color = when {
                                             isCurrent -> Color.White
                                             isCompleted -> theme.dropActiveColor

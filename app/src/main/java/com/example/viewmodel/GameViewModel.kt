@@ -69,6 +69,7 @@ data class GameUiState(
     val isStoreOpen: Boolean = false,
     val isAboutOpen: Boolean = false,
     val isVipRewardsOpen: Boolean = false,
+    val isBetaCompletedOpen: Boolean = false,
     val selectedTheme: GameTheme = GameThemes.EyeComfort,
     val equippedArrowSkin: ArrowSkinType = ArrowSkinType.DEFAULT,
     val equippedBoardCanvas: BoardCanvasType = BoardCanvasType.DEFAULT,
@@ -109,6 +110,8 @@ data class GameUiState(
 class GameViewModel(application: Application) : AndroidViewModel(application) {
 
     private val prefs = application.getSharedPreferences("amaze_go_prefs", Context.MODE_PRIVATE)
+    private val database = com.example.data.AppDatabase.getDatabase(application)
+    private val repository = com.example.data.GameRepository(database.levelProgressDao())
     val soundManager = SoundManager(application)
     private val random = Random()
 
@@ -122,6 +125,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     private var comboRewardResetJob: Job? = null
     private var sessionTimerJob: Job? = null
     private var lastClearTimestamp: Long = 0L
+    private var completionHandled = false
 
     init {
         loadPersistedState()
@@ -139,9 +143,8 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    private fun loadPersistedState() {
+        private fun loadPersistedState() {
         val currentLvl = prefs.getInt("current_level", 1)
-        val highest = prefs.getInt("highest_level", 1)
         val movementSound = prefs.getBoolean("movement_sound_enabled", prefs.getBoolean("sound_enabled", true))
         val ambientSound = prefs.getBoolean("ambient_nature_enabled", true)
         val haptic = prefs.getBoolean("haptic_enabled", true)
@@ -151,54 +154,84 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         val boardCanvasId = prefs.getString("equipped_board_canvas", BoardCanvasType.DEFAULT.id)
         val gridStyleId = prefs.getString("equipped_grid_style", MazeGridStyle.DEFAULT.id)
         val bgAnimId = prefs.getString("equipped_bg_anim", BackgroundAnimType.DEFAULT.id)
-
+        
         val theme = GameThemes.allThemes.find { it.id == themeId } ?: GameThemes.EyeComfort
         val arrowSkin = ArrowSkinType.entries.find { it.id == arrowSkinId } ?: ArrowSkinType.DEFAULT
         val boardCanvas = BoardCanvasType.entries.find { it.id == boardCanvasId } ?: BoardCanvasType.DEFAULT
         val gridStyle = MazeGridStyle.entries.find { it.id == gridStyleId } ?: MazeGridStyle.DEFAULT
         val bgAnim = BackgroundAnimType.entries.find { it.id == bgAnimId } ?: BackgroundAnimType.DEFAULT
-        val solvedCount = prefs.getInt("puzzles_solved", 0)
-        val bestCombo = prefs.getInt("best_combo", 1)
+        
         val powerupsUsed = prefs.getInt("powerups_used", 0)
         val streak = prefs.getInt("daily_streak", 1)
         val trail = prefs.getString("particle_trail", "stardust") ?: "stardust"
 
-        // Load all saved star ratings for completed levels
-        val starsMap = mutableMapOf<Int, Int>()
-        for (lvl in 1..highest) {
-            val s = prefs.getInt("stars_lvl_$lvl", 0)
-            if (s > 0) starsMap[lvl] = s
-        }
-
         soundManager.isMovementSoundEnabled = movementSound
         soundManager.isAmbientNatureEnabled = ambientSound
         soundManager.isHapticEnabled = haptic
-
         if (ambientSound) {
             soundManager.startAmbientNature()
         }
 
-        _uiState.update {
-            it.copy(
-                currentLevelNumber = currentLvl,
-                highestUnlockedLevel = maxOf(highest, currentLvl),
-                completedLevelsStars = starsMap,
-                totalPuzzlesSolved = if (solvedCount > 0) solvedCount else starsMap.size,
-                bestComboStreak = bestCombo,
-                totalPowerUpsUsed = powerupsUsed,
-                dailyStreak = streak,
-                selectedParticleTrail = trail,
-                soundEnabled = movementSound,
-                movementSoundEnabled = movementSound,
-                ambientNatureEnabled = ambientSound,
-                hapticEnabled = haptic,
-                hintsRemaining = hints,
-                selectedTheme = theme,
-                equippedArrowSkin = arrowSkin,
-                equippedBoardCanvas = boardCanvas,
-                equippedGridStyle = gridStyle,
-                equippedBackgroundAnim = bgAnim
-            )
+        viewModelScope.launch {
+            var progressList = repository.getAllProgress()
+            
+            // Migration from SharedPreferences if Room is empty
+            if (progressList.isEmpty()) {
+                val highest = prefs.getInt("highest_level", 1)
+                val bestCombo = prefs.getInt("best_combo", 1)
+                for (lvl in 1..highest) {
+                    val s = prefs.getInt("stars_lvl_$lvl", 0)
+                    if (s > 0) {
+                        repository.saveProgress(com.example.data.LevelProgress(
+                            levelNumber = lvl,
+                            isCompleted = true,
+                            stars = s,
+                            bestCombo = bestCombo
+                        ))
+                    }
+                }
+                progressList = repository.getAllProgress()
+            }
+            
+            val starsMap = mutableMapOf<Int, Int>()
+            var highestRoom = 1
+            var bestComboRoom = 1
+            var solvedRoom = 0
+            
+            for (p in progressList) {
+                if (p.isCompleted) {
+                    highestRoom = maxOf(highestRoom, p.levelNumber + 1)
+                    solvedRoom++
+                }
+                if (p.stars > 0) starsMap[p.levelNumber] = p.stars
+                if (p.bestCombo > bestComboRoom) bestComboRoom = p.bestCombo
+            }
+            
+            // Ensure highest Room is clamped up to the actual level and currentLvl
+            highestRoom = maxOf(highestRoom, currentLvl)
+            
+            _uiState.update {
+                it.copy(
+                    currentLevelNumber = currentLvl,
+                    highestUnlockedLevel = highestRoom,
+                    completedLevelsStars = starsMap,
+                    totalPuzzlesSolved = solvedRoom,
+                    bestComboStreak = bestComboRoom,
+                    totalPowerUpsUsed = powerupsUsed,
+                    dailyStreak = streak,
+                    selectedParticleTrail = trail,
+                    soundEnabled = movementSound,
+                    movementSoundEnabled = movementSound,
+                    ambientNatureEnabled = ambientSound,
+                    hapticEnabled = haptic,
+                    hintsRemaining = hints,
+                    selectedTheme = theme,
+                    equippedArrowSkin = arrowSkin,
+                    equippedBoardCanvas = boardCanvas,                
+                    equippedGridStyle = gridStyle,
+                    equippedBackgroundAnim = bgAnim
+                )
+            }
         }
     }
 
@@ -214,8 +247,9 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
      */
     fun unlockLevel(levelNumber: Int) {
         val newHighest = maxOf(_uiState.value.highestUnlockedLevel, levelNumber)
-        prefs.edit().putInt("highest_level", newHighest).apply()
         _uiState.update { it.copy(highestUnlockedLevel = newHighest) }
+        // No need to persist "highest_level" separately in Room, 
+        // as the highest completed level determines it on load.
     }
 
     /**
@@ -295,16 +329,18 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
      */
     fun loadLevel(levelNumber: Int) {
         val safeLevel = maxOf(1, levelNumber)
+        
+        // Prevent loading locked levels normally
+        if (safeLevel > _uiState.value.highestUnlockedLevel) {
+            return
+        }
+
         val level = LevelRepository.getLevel(safeLevel)
         levelStartTime = System.currentTimeMillis()
+        completionHandled = false
 
         // Track and persist the current level
         prefs.edit().putInt("current_level", safeLevel).apply()
-
-        // Auto-unlock the level if navigated to
-        if (safeLevel > _uiState.value.highestUnlockedLevel) {
-            unlockLevel(safeLevel)
-        }
 
         collisionResetJob?.cancel()
         hintResetJob?.cancel()
@@ -334,10 +370,6 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 isLevelCompleted = false,
                 isLevelFailed = false,
                 isLevelSelectOpen = false,
-                comboMultiplier = 1,
-                showComboBanner = false,
-                comboReward = null,
-                activePowerUp = null,
                 powerUpsRemaining = guaranteedPowers,
                 impactSparks = emptyList(),
                 softDustParticles = emptyList(),
@@ -347,20 +379,18 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    /**
-     * Restarts the current level with a clean grid reset.
-     */
-    fun restartCurrentLevel() {
-        loadLevel(_uiState.value.currentLevelNumber)
-    }
-
-    /**
-     * Advances to and unlocks the next subsequent puzzle, resetting the grid state.
-     */
     fun nextLevel() {
+        if (_uiState.value.currentLevelNumber >= 200) {
+            _uiState.update { it.copy(isLevelCompleted = false, isBetaCompletedOpen = true) }
+            return
+        }
         val next = _uiState.value.currentLevelNumber + 1
         unlockLevel(next)
         loadLevel(next)
+    }
+    
+    fun closeBetaCompleted() {
+        _uiState.update { it.copy(isBetaCompletedOpen = false, isMainMenuActive = true) }
     }
 
     /**
@@ -369,16 +399,18 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     fun onArrowTapped(arrow: ArrowItem) {
         val state = _uiState.value
         if (state.isLevelCompleted || state.isLevelFailed) return
-        if (state.flyingArrows.any { it.arrow.id == arrow.id }) return
+        
+        val currentArrow = state.activeArrows.firstOrNull { it.id == arrow.id } ?: return
+        if (state.flyingArrows.any { it.arrow.id == currentArrow.id }) return
 
         // Check if an active targeting power-up is waiting for an arrow
         when (state.activePowerUp) {
             PowerUpType.SNIP -> {
-                applySnipPowerUp(arrow)
+                applySnipPowerUp(currentArrow)
                 return
             }
             PowerUpType.GHOST -> {
-                applyGhostPowerUp(arrow)
+                applyGhostPowerUp(currentArrow)
                 return
             }
             else -> {}
@@ -392,16 +424,16 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
 
         // Check if collision occurs
         val collision = PuzzleSolver.checkCollision(
-            arrow = arrow,
+            arrow = currentArrow,
             activeArrows = state.activeArrows,
             gridWidth = state.levelData.gridWidth,
             gridHeight = state.levelData.gridHeight
         )
 
         if (collision != null) {
-            handleArrowBlocked(arrow, collision)
+            handleArrowBlocked(currentArrow, collision)
         } else {
-            handleArrowClear(arrow)
+            handleArrowClear(currentArrow)
         }
     }
 
@@ -541,19 +573,22 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                     )
                 }
             }
-
+            
             _uiState.update { current ->
-                current.copy(
-                    flyingArrows = current.flyingArrows.filter { it.arrow.id != arrow.id }
-                )
-            }
-
-            if (remainingActive.isEmpty()) {
-                handleLevelCompleted()
+                val newFlying = current.flyingArrows.filter { it.arrow.id != arrow.id }
+                
+                // Authoritative check after flight completes
+                if (current.activeArrows.isEmpty() && newFlying.isEmpty() && !current.isLevelCompleted && !current.isLevelFailed) {
+                    if (!completionHandled) {
+                        completionHandled = true
+                        handleLevelCompleted()
+                    }
+                }
+                
+                current.copy(flyingArrows = newFlying)
+    }
             }
         }
-    }
-
     private fun generateSoftDustParticles(arrow: ArrowItem, theme: GameTheme): List<SoftDustParticle> {
         val particles = ArrayList<SoftDustParticle>()
         val basePoint = arrow.points.last()
@@ -605,11 +640,17 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         val newBestCombo = maxOf(state.bestComboStreak, state.comboMultiplier)
 
         prefs.edit()
-            .putInt("highest_level", newHighest)
-            .putInt("stars_lvl_${state.currentLevelNumber}", stars)
             .putInt("puzzles_solved", newSolvedCount)
-            .putInt("best_combo", newBestCombo)
             .apply()
+            
+        viewModelScope.launch {
+            repository.saveProgress(com.example.data.LevelProgress(
+                levelNumber = state.currentLevelNumber,
+                isCompleted = true,
+                stars = stars,
+                bestCombo = newBestCombo
+            ))
+        }
 
         soundManager.playLevelComplete()
 
@@ -938,6 +979,34 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             it.copy(
                 dailyStreak = newStreak,
                 isDailyChallengeCompletedToday = true
+            )
+        }
+    }
+
+    
+    fun restartCurrentLevel() {
+        val state = _uiState.value
+        val level = state.levelData
+        
+        collisionResetJob?.cancel()
+        hintResetJob?.cancel()
+        
+        _uiState.update {
+            it.copy(
+                activeArrows = level.arrows,
+                flyingArrows = emptyList(),
+                remainingDrops = level.maxDrops,
+                movesCount = 0,
+                hintArrowId = null,
+                guidanceArrowId = null,
+                collisionInfo = null,
+                isLevelCompleted = false,
+                isLevelFailed = false,
+                isResetConfirmOpen = false,
+                impactSparks = emptyList(),
+                softDustParticles = emptyList(),
+                shockwaves = emptyList(),
+                moveHistory = emptyList()
             )
         }
     }

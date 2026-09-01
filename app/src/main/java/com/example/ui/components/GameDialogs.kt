@@ -1,5 +1,7 @@
 package com.example.ui.components
 
+import com.example.model.CityConfig
+import com.example.model.CityRepository
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -350,15 +352,19 @@ fun LevelSelectDialog(
     val focusManager = LocalFocusManager.current
     var selectedTab by remember { mutableIntStateOf(0) }
 
-    // Page state for 10000+ levels (50 levels per page)
+    val currentCity = CityRepository.getCityForLevel(uiState.currentLevelNumber)
+    var selectedCityId by remember { mutableIntStateOf(currentCity.id) }
+    val activeCity = CityRepository.getCityById(selectedCityId)
+
+    // Page state for 200 routes grid (50 routes per page)
     val pageSize = 50
-    val initialPage = ((uiState.currentLevelNumber - 1) / pageSize).coerceIn(0, 199)
+    val initialPage = ((uiState.currentLevelNumber - 1) / pageSize).coerceIn(0, 3)
     var currentPage by remember { mutableIntStateOf(initialPage) }
     var jumpInputText by remember { mutableStateOf("") }
     var jumpErrorMessage by remember { mutableStateOf<String?>(null) }
 
     val pageStart = currentPage * pageSize + 1
-    val pageEnd = pageStart + pageSize - 1
+    val pageEnd = (pageStart + pageSize - 1).coerceAtMost(200)
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -369,7 +375,7 @@ fun LevelSelectDialog(
             colors = CardDefaults.cardColors(containerColor = theme.cardBg),
             modifier = Modifier
                 .fillMaxWidth(0.94f)
-                .fillMaxHeight(0.88f)
+                .fillMaxHeight(0.90f)
                 .padding(vertical = 12.dp)
                 .shadow(20.dp, RoundedCornerShape(26.dp))
                 .testTag("level_select_dialog")
@@ -387,13 +393,13 @@ fun LevelSelectDialog(
                 ) {
                     Column {
                         Text(
-                            text = "Select Level",
-                            fontSize = 22.sp,
+                            text = "10 Cities • 200 Routes",
+                            fontSize = 20.sp,
                             fontWeight = FontWeight.Bold,
                             color = theme.textPrimary
                         )
                         Text(
-                            text = "Highest Reached: Level ${uiState.highestUnlockedLevel} • 10,000+ Mazes",
+                            text = "Highest Reached: Route ${uiState.highestUnlockedLevel} / 200",
                             fontSize = 12.sp,
                             color = theme.textSecondary
                         )
@@ -426,7 +432,7 @@ fun LevelSelectDialog(
                         onClick = { selectedTab = 0 },
                         text = {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text("🎨 Art Silhouettes", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                Text("🏙️ 10 Cities", fontWeight = FontWeight.Bold, fontSize = 13.sp)
                             }
                         }
                     )
@@ -435,7 +441,16 @@ fun LevelSelectDialog(
                         onClick = { selectedTab = 1 },
                         text = {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text("🗺️ All (10,000+)", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                Text("🎨 40 Silhouettes", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            }
+                        }
+                    )
+                    Tab(
+                        selected = selectedTab == 2,
+                        onClick = { selectedTab = 2 },
+                        text = {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text("🗺️ All 200", fontWeight = FontWeight.Bold, fontSize = 13.sp)
                             }
                         }
                     )
@@ -443,128 +458,163 @@ fun LevelSelectDialog(
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                if (selectedTab == 0) {
-                    // TAB 0: Art Silhouettes (Handcrafted Milestones)
-                    LazyVerticalGrid(
-                        columns = GridCells.Fixed(2),
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(1f)
-                    ) {
-                        items(LevelRepository.silhouetteLevels.size) { idx ->
-                            val item = LevelRepository.silhouetteLevels[idx]
-                            val isCurrent = item.levelNumber == uiState.currentLevelNumber
-                            val isUnlocked = item.levelNumber <= uiState.highestUnlockedLevel
-                            val stars = uiState.completedLevelsStars[item.levelNumber] ?: 0
-
-                            Surface(
+                when (selectedTab) {
+                    0 -> {
+                        // TAB 0: 10 CITIES EXPLORER
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1f)
+                        ) {
+                            // City Selector Horizontal Pills
+                            Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .height(104.dp)
-                                    .clip(RoundedCornerShape(14.dp))
-                                    .border(
-                                        width = if (isCurrent) 2.dp else 1.dp,
-                                        color = if (isCurrent) theme.headerGold else theme.bannerBorder,
-                                        shape = RoundedCornerShape(14.dp)
-                                    )
-                                    .clickable(enabled = isUnlocked) {
-                                        onSelectLevel(item.levelNumber)
-                                    },
-                                color = if (isCurrent) theme.boardBackground else if (isUnlocked) theme.cardBg else theme.bannerBg.copy(alpha = 0.35f)
+                                    .horizontalScroll(rememberScrollState()),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
-                                Column(
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .padding(8.dp),
-                                    verticalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
+                                CityRepository.cities.forEach { city ->
+                                    val isSelected = city.id == selectedCityId
+                                    val isCityUnlocked = city.startLevel <= uiState.highestUnlockedLevel
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(10.dp))
+                                            .background(if (isSelected) theme.headerGold else if (isCityUnlocked) theme.boardBackground else theme.bannerBg.copy(alpha = 0.3f))
+                                            .clickable { selectedCityId = city.id }
+                                            .padding(horizontal = 10.dp, vertical = 6.dp)
                                     ) {
-                                        Text(
-                                            text = item.icon,
-                                            fontSize = 20.sp
-                                        )
-                                        Box(
-                                            modifier = Modifier
-                                                .clip(RoundedCornerShape(6.dp))
-                                                .background(if (isUnlocked) theme.dropActiveColor.copy(alpha = 0.15f) else theme.boardBackground)
-                                                .padding(horizontal = 6.dp, vertical = 2.dp)
-                                        ) {
-                                            Text(
-                                                text = "Lvl ${item.levelNumber}",
-                                                fontSize = 11.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                color = if (isUnlocked) theme.dropActiveColor else theme.textSecondary
-                                            )
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Text(text = "${city.icon} ${city.name}", fontSize = 11.sp, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium, color = if (isSelected) Color.White else theme.textPrimary)
                                         }
                                     }
+                                }
+                            }
 
-                                    Column {
-                                        Text(
-                                            text = item.title,
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 13.sp,
-                                            color = if (isUnlocked) theme.textPrimary else theme.textSecondary,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                        Text(
-                                            text = item.subtitle,
-                                            fontSize = 10.sp,
-                                            color = theme.textSecondary,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                    }
+                            Spacer(modifier = Modifier.height(10.dp))
 
+                            // Selected City Banner Card
+                            Surface(
+                                shape = RoundedCornerShape(14.dp),
+                                color = theme.boardBackground,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(modifier = Modifier.padding(12.dp)) {
                                     Row(
                                         modifier = Modifier.fillMaxWidth(),
                                         horizontalArrangement = Arrangement.SpaceBetween,
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        if (isCurrent) {
+                                        Column {
                                             Text(
-                                                text = "PLAYING",
-                                                fontSize = 10.sp,
+                                                text = "${activeCity.icon} CITY ${activeCity.id}: ${activeCity.name}",
+                                                fontSize = 15.sp,
                                                 fontWeight = FontWeight.ExtraBold,
                                                 color = theme.headerGold
                                             )
-                                        } else if (stars > 0) {
-                                            Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-                                                for (s in 1..stars) {
-                                                    Icon(
-                                                        Icons.Filled.Star,
-                                                        contentDescription = null,
-                                                        tint = Color(0xFFFBBF24),
-                                                        modifier = Modifier.size(13.dp)
-                                                    )
-                                                }
-                                            }
-                                        } else if (isUnlocked) {
                                             Text(
-                                                text = item.difficulty,
-                                                fontSize = 10.sp,
+                                                text = "${activeCity.subtitle} • Routes ${activeCity.startLevel}–${activeCity.endLevel}",
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.SemiBold,
                                                 color = theme.textSecondary
                                             )
-                                        } else {
-                                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                                Icon(
-                                                    Icons.Filled.Lock,
-                                                    contentDescription = "Locked",
-                                                    tint = theme.textSecondary.copy(alpha = 0.6f),
-                                                    modifier = Modifier.size(12.dp)
-                                                )
-                                                Spacer(modifier = Modifier.width(4.dp))
+                                        }
+                                        Box(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(6.dp))
+                                                .background(theme.headerGold.copy(alpha = 0.15f))
+                                                .padding(horizontal = 8.dp, vertical = 3.dp)
+                                        ) {
+                                            Text(
+                                                text = activeCity.difficultyLabel,
+                                                fontSize = 10.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = theme.headerGold
+                                            )
+                                        }
+                                    }
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        text = activeCity.themeDescription,
+                                        fontSize = 11.sp,
+                                        color = theme.textSecondary.copy(alpha = 0.85f)
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(10.dp))
+
+                            // 20 Routes Grid for Selected City
+                            LazyVerticalGrid(
+                                columns = GridCells.Fixed(4),
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .weight(1f)
+                            ) {
+                                items(activeCity.totalRoutes) { offset ->
+                                    val lvlNum = activeCity.startLevel + offset
+                                    val routeInCity = offset + 1
+                                    val isCurrent = lvlNum == uiState.currentLevelNumber
+                                    val isUnlocked = lvlNum <= uiState.highestUnlockedLevel
+                                    val stars = uiState.completedLevelsStars[lvlNum] ?: 0
+                                    val isAnchor = routeInCity % 5 == 0
+
+                                    Surface(
+                                        modifier = Modifier
+                                            .height(68.dp)
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .border(
+                                                width = if (isCurrent) 2.dp else if (isAnchor) 1.5.dp else 1.dp,
+                                                color = when {
+                                                    isCurrent -> theme.headerGold
+                                                    isAnchor -> theme.headerGold.copy(alpha = 0.6f)
+                                                    else -> theme.bannerBorder
+                                                },
+                                                shape = RoundedCornerShape(12.dp)
+                                            )
+                                            .clickable(enabled = isUnlocked) {
+                                                onSelectLevel(lvlNum)
+                                            },
+                                        color = if (isCurrent) theme.boardBackground else if (isUnlocked) theme.cardBg else theme.bannerBg.copy(alpha = 0.35f)
+                                    ) {
+                                        Column(
+                                            modifier = Modifier
+                                                .fillMaxSize()
+                                                .padding(6.dp),
+                                            verticalArrangement = Arrangement.SpaceBetween,
+                                            horizontalAlignment = Alignment.CenterHorizontally
+                                        ) {
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
                                                 Text(
-                                                    text = "Lvl ${item.levelNumber}",
-                                                    fontSize = 10.sp,
-                                                    color = theme.textSecondary.copy(alpha = 0.7f)
+                                                    text = "R$routeInCity",
+                                                    fontSize = 11.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = if (isCurrent) theme.headerGold else if (isUnlocked) theme.textPrimary else theme.textSecondary
                                                 )
+                                                if (isAnchor) {
+                                                    Text(text = "⭐", fontSize = 10.sp)
+                                                }
+                                            }
+
+                                            if (isUnlocked) {
+                                                if (isCurrent) {
+                                                    Text(text = "PLAYING", fontSize = 9.sp, fontWeight = FontWeight.ExtraBold, color = theme.headerGold)
+                                                } else if (stars > 0) {
+                                                    Row(horizontalArrangement = Arrangement.spacedBy(1.dp)) {
+                                                        for (s in 1..stars) {
+                                                            Icon(Icons.Filled.Star, contentDescription = null, tint = Color(0xFFFBBF24), modifier = Modifier.size(10.dp))
+                                                        }
+                                                    }
+                                                } else {
+                                                    Text(text = "Lvl $lvlNum", fontSize = 10.sp, color = theme.textSecondary)
+                                                }
+                                            } else {
+                                                Icon(Icons.Filled.Lock, contentDescription = "Locked", tint = theme.textSecondary.copy(alpha = 0.5f), modifier = Modifier.size(13.dp))
                                             }
                                         }
                                     }
@@ -572,243 +622,368 @@ fun LevelSelectDialog(
                             }
                         }
                     }
-                } else {
-                    // TAB 1: 10,000+ Universe with Sector Pagination & Fast Search
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(1f)
-                    ) {
-                        // Quick Sector Chips (Horizontal Scroll)
-                        val sectorPresets = listOf(
-                            "1 - 50" to 0,
-                            "51 - 100" to 1,
-                            "101 - 150" to 2,
-                            "151 - 200" to 3,
-                            "201 - 250" to 4,
-                            "251 - 500" to 5,
-                            "501 - 1000" to 10,
-                            "1001 - 5000" to 20,
-                            "5001 - 10000" to 100
-                        )
 
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .horizontalScroll(rememberScrollState()),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            sectorPresets.forEach { (label, targetPage) ->
-                                val isSelected = currentPage == targetPage
-                                Box(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .background(if (isSelected) theme.headerGold else theme.boardBackground)
-                                        .clickable { currentPage = targetPage }
-                                        .padding(horizontal = 10.dp, vertical = 6.dp)
-                                ) {
-                                    Text(
-                                        text = label,
-                                        fontSize = 11.sp,
-                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                        color = if (isSelected) Color.White else theme.textPrimary
-                                    )
-                                }
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(10.dp))
-
-                        // Page Stepper & Active Level Button
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            IconButton(
-                                onClick = { if (currentPage > 0) currentPage-- },
-                                enabled = currentPage > 0,
-                                modifier = Modifier.size(36.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
-                                    contentDescription = "Previous Page",
-                                    tint = if (currentPage > 0) theme.textPrimary else theme.textSecondary.copy(alpha = 0.3f)
-                                )
-                            }
-
-                            Text(
-                                text = "Levels $pageStart – $pageEnd",
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = theme.textPrimary
-                            )
-
-                            IconButton(
-                                onClick = { if (currentPage < 199) currentPage++ },
-                                enabled = currentPage < 199,
-                                modifier = Modifier.size(36.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Outlined.ArrowForward,
-                                    contentDescription = "Next Page",
-                                    tint = if (currentPage < 199) theme.textPrimary else theme.textSecondary.copy(alpha = 0.3f)
-                                )
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(6.dp))
-
-                        // Level Grid (50 levels per page)
+                    1 -> {
+                        // TAB 1: 40 ART SILHOUETTES
                         LazyVerticalGrid(
-                            columns = GridCells.Fixed(5),
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            columns = GridCells.Fixed(2),
+                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .weight(1f)
                         ) {
-                            items(pageSize) { offset ->
-                                val lvlNum = pageStart + offset
-                                val isCurrent = lvlNum == uiState.currentLevelNumber
-                                val isUnlocked = lvlNum <= uiState.highestUnlockedLevel
-                                val stars = uiState.completedLevelsStars[lvlNum] ?: 0
+                            items(LevelRepository.silhouetteLevels.size) { idx ->
+                                val item = LevelRepository.silhouetteLevels[idx]
+                                val isCurrent = item.levelNumber == uiState.currentLevelNumber
+                                val isUnlocked = item.levelNumber <= uiState.highestUnlockedLevel
+                                val stars = uiState.completedLevelsStars[item.levelNumber] ?: 0
 
-                                Box(
+                                Surface(
                                     modifier = Modifier
-                                        .size(48.dp)
-                                        .clip(RoundedCornerShape(12.dp))
-                                        .background(
-                                            if (isCurrent) theme.headerGold
-                                            else if (isUnlocked) theme.boardBackground
-                                            else theme.bannerBg.copy(alpha = 0.4f)
-                                        )
+                                        .fillMaxWidth()
+                                        .height(104.dp)
+                                        .clip(RoundedCornerShape(14.dp))
                                         .border(
-                                            width = if (isCurrent) 2.dp else if (isUnlocked && stars > 0) 1.dp else 0.dp,
-                                            color = if (isCurrent) Color.White else if (stars > 0) Color(0xFFFBBF24).copy(alpha = 0.6f) else Color.Transparent,
-                                            shape = RoundedCornerShape(12.dp)
+                                            width = if (isCurrent) 2.dp else 1.dp,
+                                            color = if (isCurrent) theme.headerGold else theme.bannerBorder,
+                                            shape = RoundedCornerShape(14.dp)
                                         )
                                         .clickable(enabled = isUnlocked) {
-                                            onSelectLevel(lvlNum)
+                                            onSelectLevel(item.levelNumber)
                                         },
-                                    contentAlignment = Alignment.Center
+                                    color = if (isCurrent) theme.boardBackground else if (isUnlocked) theme.cardBg else theme.bannerBg.copy(alpha = 0.35f)
                                 ) {
-                                    if (isUnlocked) {
-                                        Column(
-                                            horizontalAlignment = Alignment.CenterHorizontally,
-                                            verticalArrangement = Arrangement.Center
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .padding(8.dp),
+                                        verticalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
                                         ) {
                                             Text(
-                                                text = lvlNum.toString(),
-                                                fontWeight = FontWeight.Bold,
-                                                fontSize = if (lvlNum >= 1000) 11.sp else 13.sp,
-                                                color = if (isCurrent) Color.White else theme.textPrimary
+                                                text = item.icon,
+                                                fontSize = 20.sp
                                             )
-                                            if (stars > 0) {
-                                                Row(
-                                                    horizontalArrangement = Arrangement.spacedBy(1.dp),
-                                                    modifier = Modifier.padding(top = 1.dp)
-                                                ) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .clip(RoundedCornerShape(6.dp))
+                                                    .background(if (isUnlocked) theme.dropActiveColor.copy(alpha = 0.15f) else theme.boardBackground)
+                                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                                            ) {
+                                                Text(
+                                                    text = "Lvl ${item.levelNumber}",
+                                                    fontSize = 11.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = if (isUnlocked) theme.dropActiveColor else theme.textSecondary
+                                                )
+                                            }
+                                        }
+
+                                        Column {
+                                            Text(
+                                                text = item.title,
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 13.sp,
+                                                color = if (isUnlocked) theme.textPrimary else theme.textSecondary,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                            Text(
+                                                text = item.subtitle,
+                                                fontSize = 10.sp,
+                                                color = theme.textSecondary,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                        }
+
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            if (isCurrent) {
+                                                Text(
+                                                    text = "PLAYING",
+                                                    fontSize = 10.sp,
+                                                    fontWeight = FontWeight.ExtraBold,
+                                                    color = theme.headerGold
+                                                )
+                                            } else if (stars > 0) {
+                                                Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                                                     for (s in 1..stars) {
                                                         Icon(
                                                             Icons.Filled.Star,
                                                             contentDescription = null,
-                                                            tint = if (isCurrent) Color.White else Color(0xFFFBBF24),
-                                                            modifier = Modifier.size(8.dp)
+                                                            tint = Color(0xFFFBBF24),
+                                                            modifier = Modifier.size(13.dp)
                                                         )
                                                     }
                                                 }
+                                            } else if (isUnlocked) {
+                                                Text(
+                                                    text = item.difficulty,
+                                                    fontSize = 10.sp,
+                                                    color = theme.textSecondary
+                                                )
+                                            } else {
+                                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                                    Icon(
+                                                        Icons.Filled.Lock,
+                                                        contentDescription = "Locked",
+                                                        tint = theme.textSecondary.copy(alpha = 0.6f),
+                                                        modifier = Modifier.size(12.dp)
+                                                    )
+                                                    Spacer(modifier = Modifier.width(4.dp))
+                                                    Text(
+                                                        text = "Lvl ${item.levelNumber}",
+                                                        fontSize = 10.sp,
+                                                        color = theme.textSecondary.copy(alpha = 0.7f)
+                                                    )
+                                                }
                                             }
                                         }
-                                    } else {
-                                        Icon(
-                                            Icons.Filled.Lock,
-                                            contentDescription = "Locked",
-                                            tint = theme.textSecondary.copy(alpha = 0.5f),
-                                            modifier = Modifier.size(15.dp)
-                                        )
                                     }
                                 }
                             }
                         }
+                    }
 
-                        Spacer(modifier = Modifier.height(10.dp))
-
-                        // Jump to Level Input Row
-                        Row(
+                    2 -> {
+                        // TAB 2: QUICK 200 ROUTE GRID
+                        Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(theme.boardBackground)
-                                .padding(horizontal = 10.dp, vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
+                                .weight(1f)
                         ) {
-                            OutlinedTextField(
-                                value = jumpInputText,
-                                onValueChange = {
-                                    jumpInputText = it.filter { ch -> ch.isDigit() }.take(5)
-                                    jumpErrorMessage = null
-                                },
-                                placeholder = { Text("Jump to Level # (1-10000)", fontSize = 11.sp, color = theme.textSecondary) },
-                                singleLine = true,
-                                keyboardOptions = KeyboardOptions(
-                                    keyboardType = KeyboardType.Number,
-                                    imeAction = ImeAction.Go
-                                ),
-                                keyboardActions = KeyboardActions(onGo = {
-                                    val target = jumpInputText.toIntOrNull()
-                                    if (target != null && target in 1..10000) {
-                                        if (target <= uiState.highestUnlockedLevel) {
-                                            onSelectLevel(target)
-                                        } else {
-                                            currentPage = ((target - 1) / pageSize).coerceIn(0, 199)
-                                            jumpErrorMessage = "Level $target is locked. Clear earlier levels first!"
-                                        }
-                                        focusManager.clearFocus()
-                                    }
-                                }),
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedBorderColor = theme.headerGold,
-                                    unfocusedBorderColor = Color.Transparent,
-                                    focusedTextColor = theme.textPrimary,
-                                    unfocusedTextColor = theme.textPrimary
-                                ),
+                            val sectorPresets = listOf(
+                                "1 - 50" to 0,
+                                "51 - 100" to 1,
+                                "101 - 150" to 2,
+                                "151 - 200" to 3
+                            )
+
+                            Row(
                                 modifier = Modifier
-                                    .weight(1f)
-                                    .height(48.dp)
-                            )
-
-                            Spacer(modifier = Modifier.width(8.dp))
-
-                            Button(
-                                onClick = {
-                                    val target = jumpInputText.toIntOrNull()
-                                    if (target != null && target in 1..10000) {
-                                        if (target <= uiState.highestUnlockedLevel) {
-                                            onSelectLevel(target)
-                                        } else {
-                                            currentPage = ((target - 1) / pageSize).coerceIn(0, 199)
-                                            jumpErrorMessage = "Level $target is locked. Clear earlier levels first!"
-                                        }
-                                        focusManager.clearFocus()
-                                    }
-                                },
-                                colors = ButtonDefaults.buttonColors(containerColor = theme.headerGold),
-                                shape = RoundedCornerShape(10.dp),
-                                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
+                                    .fillMaxWidth()
+                                    .horizontalScroll(rememberScrollState()),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
-                                Text("GO", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color.White)
+                                sectorPresets.forEach { (label, targetPage) ->
+                                    val isSelected = currentPage == targetPage
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(if (isSelected) theme.headerGold else theme.boardBackground)
+                                            .clickable { currentPage = targetPage }
+                                            .padding(horizontal = 10.dp, vertical = 6.dp)
+                                    ) {
+                                        Text(
+                                            text = label,
+                                            fontSize = 11.sp,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                            color = if (isSelected) Color.White else theme.textPrimary
+                                        )
+                                    }
+                                }
                             }
-                        }
 
-                        if (jumpErrorMessage != null) {
-                            Text(
-                                text = jumpErrorMessage ?: "",
-                                fontSize = 11.sp,
-                                color = theme.dropActiveColor,
-                                modifier = Modifier.padding(top = 4.dp, start = 4.dp)
-                            )
+                            Spacer(modifier = Modifier.height(10.dp))
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                IconButton(
+                                    onClick = { if (currentPage > 0) currentPage-- },
+                                    enabled = currentPage > 0,
+                                    modifier = Modifier.size(36.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
+                                        contentDescription = "Previous Page",
+                                        tint = if (currentPage > 0) theme.textPrimary else theme.textSecondary.copy(alpha = 0.3f)
+                                    )
+                                }
+
+                                Text(
+                                    text = "Routes $pageStart – $pageEnd",
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = theme.textPrimary
+                                )
+
+                                IconButton(
+                                    onClick = { if (currentPage < 3) currentPage++ },
+                                    enabled = currentPage < 3,
+                                    modifier = Modifier.size(36.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.AutoMirrored.Outlined.ArrowForward,
+                                        contentDescription = "Next Page",
+                                        tint = if (currentPage < 3) theme.textPrimary else theme.textSecondary.copy(alpha = 0.3f)
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(6.dp))
+
+                            LazyVerticalGrid(
+                                columns = GridCells.Fixed(5),
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .weight(1f)
+                            ) {
+                                val countOnThisPage = (pageEnd - pageStart + 1).coerceAtLeast(0)
+                                items(countOnThisPage) { offset ->
+                                    val lvlNum = pageStart + offset
+                                    val isCurrent = lvlNum == uiState.currentLevelNumber
+                                    val isUnlocked = lvlNum <= uiState.highestUnlockedLevel
+                                    val stars = uiState.completedLevelsStars[lvlNum] ?: 0
+
+                                    Box(
+                                        modifier = Modifier
+                                            .size(48.dp)
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .background(
+                                                if (isCurrent) theme.headerGold
+                                                else if (isUnlocked) theme.boardBackground
+                                                else theme.bannerBg.copy(alpha = 0.4f)
+                                            )
+                                            .border(
+                                                width = if (isCurrent) 2.dp else if (isUnlocked && stars > 0) 1.dp else 0.dp,
+                                                color = if (isCurrent) Color.White else if (stars > 0) Color(0xFFFBBF24).copy(alpha = 0.6f) else Color.Transparent,
+                                                shape = RoundedCornerShape(12.dp)
+                                            )
+                                            .clickable(enabled = isUnlocked) {
+                                                onSelectLevel(lvlNum)
+                                            },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        if (isUnlocked) {
+                                            Column(
+                                                horizontalAlignment = Alignment.CenterHorizontally,
+                                                verticalArrangement = Arrangement.Center
+                                            ) {
+                                                Text(
+                                                    text = lvlNum.toString(),
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontSize = 13.sp,
+                                                    color = if (isCurrent) Color.White else theme.textPrimary
+                                                )
+                                                if (stars > 0) {
+                                                    Row(
+                                                        horizontalArrangement = Arrangement.spacedBy(1.dp),
+                                                        modifier = Modifier.padding(top = 1.dp)
+                                                    ) {
+                                                        for (s in 1..stars) {
+                                                            Icon(
+                                                                Icons.Filled.Star,
+                                                                contentDescription = null,
+                                                                tint = if (isCurrent) Color.White else Color(0xFFFBBF24),
+                                                                modifier = Modifier.size(8.dp)
+                                                            )
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        } else {
+                                            Icon(
+                                                Icons.Filled.Lock,
+                                                contentDescription = "Locked",
+                                                tint = theme.textSecondary.copy(alpha = 0.5f),
+                                                modifier = Modifier.size(15.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(10.dp))
+
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(theme.boardBackground)
+                                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                OutlinedTextField(
+                                    value = jumpInputText,
+                                    onValueChange = {
+                                        jumpInputText = it.filter { ch -> ch.isDigit() }.take(3)
+                                        jumpErrorMessage = null
+                                    },
+                                    placeholder = { Text("Jump to Route # (1-200)", fontSize = 11.sp, color = theme.textSecondary) },
+                                    singleLine = true,
+                                    keyboardOptions = KeyboardOptions(
+                                        keyboardType = KeyboardType.Number,
+                                        imeAction = ImeAction.Go
+                                    ),
+                                    keyboardActions = KeyboardActions(onGo = {
+                                        val target = jumpInputText.toIntOrNull()
+                                        if (target != null && target in 1..200) {
+                                            if (target <= uiState.highestUnlockedLevel) {
+                                                onSelectLevel(target)
+                                            } else {
+                                                currentPage = ((target - 1) / pageSize).coerceIn(0, 3)
+                                                jumpErrorMessage = "Route $target is locked. Clear earlier routes first!"
+                                            }
+                                            focusManager.clearFocus()
+                                        }
+                                    }),
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedBorderColor = theme.headerGold,
+                                        unfocusedBorderColor = Color.Transparent,
+                                        focusedTextColor = theme.textPrimary,
+                                        unfocusedTextColor = theme.textPrimary
+                                    ),
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(48.dp)
+                                )
+
+                                Spacer(modifier = Modifier.width(8.dp))
+
+                                Button(
+                                    onClick = {
+                                        val target = jumpInputText.toIntOrNull()
+                                        if (target != null && target in 1..200) {
+                                            if (target <= uiState.highestUnlockedLevel) {
+                                                onSelectLevel(target)
+                                            } else {
+                                                currentPage = ((target - 1) / pageSize).coerceIn(0, 3)
+                                                jumpErrorMessage = "Route $target is locked. Clear earlier routes first!"
+                                            }
+                                            focusManager.clearFocus()
+                                        }
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = theme.headerGold),
+                                    shape = RoundedCornerShape(10.dp),
+                                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
+                                ) {
+                                    Text("GO", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color.White)
+                                }
+                            }
+
+                            if (jumpErrorMessage != null) {
+                                Text(
+                                    text = jumpErrorMessage ?: "",
+                                    fontSize = 11.sp,
+                                    color = theme.dropActiveColor,
+                                    modifier = Modifier.padding(top = 4.dp, start = 4.dp)
+                                )
+                            }
                         }
                     }
                 }
@@ -2127,3 +2302,67 @@ fun AboutInfoDialog(
     }
 }
 
+
+@Composable
+fun BetaCompleteDialog(
+    uiState: com.example.viewmodel.GameUiState,
+    onDismiss: () -> Unit
+) {
+    val theme = uiState.selectedTheme
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(dismissOnBackPress = true, dismissOnClickOutside = true)) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(theme.boardBackground, RoundedCornerShape(24.dp))
+                .border(2.dp, theme.headerGold.copy(alpha = 0.5f), RoundedCornerShape(24.dp))
+                .padding(24.dp)
+        ) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Icon(
+                    Icons.Filled.Star,
+                    contentDescription = "Beta Complete",
+                    tint = theme.headerGold,
+                    modifier = Modifier.size(64.dp)
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = "ARROW CITY",
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = theme.textPrimary
+                )
+                Text(
+                    text = "THE JOURNEY IS COMPLETE",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = theme.textSecondary
+                )
+                Spacer(modifier = Modifier.height(24.dp))
+                Text(
+                    text = "200 / 200 ROUTES",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = theme.headerGold
+                )
+                Text(
+                    text = "10 CITIES MASTERED",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = theme.headerGold
+                )
+                Spacer(modifier = Modifier.height(32.dp))
+                Button(
+                    onClick = onDismiss,
+                    colors = ButtonDefaults.buttonColors(containerColor = theme.headerGold),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth().height(50.dp)
+                ) {
+                    Text("Return Home", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = theme.boardBackground)
+                }
+            }
+        }
+    }
+}

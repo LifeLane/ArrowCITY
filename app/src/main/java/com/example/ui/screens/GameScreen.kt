@@ -25,6 +25,7 @@ import com.example.ui.components.GameTopBar
 import com.example.ui.components.LevelCompleteDialog
 import com.example.ui.components.LevelFailedDialog
 import com.example.ui.components.LevelSelectDialog
+import com.example.ui.components.BetaCompleteDialog
 import com.example.ui.components.SettingsDialog
 import com.example.ui.components.StatisticsDialog
 import com.example.ui.components.ThemeSelectDialog
@@ -140,6 +141,14 @@ fun GameScreen(
             uiState = uiState,
             onRevive = { viewModel.reviveWithDrops(3) },
             onRestart = { viewModel.restartCurrentLevel() }
+        )
+    }
+
+    
+    if (uiState.isBetaCompletedOpen) {
+        BetaCompleteDialog(
+            uiState = uiState,
+            onDismiss = { viewModel.closeBetaCompleted() }
         )
     }
 
