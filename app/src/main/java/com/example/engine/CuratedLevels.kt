@@ -16,7 +16,7 @@ object CuratedLevels {
             // Level 1: Zendai Route 1 - Introduction
             put(1, LevelData(
                 levelNumber = 1,
-                title = "City 1 • Route 1 • First Steps",
+                title = "City 1 • Route 1 • First Launch",
                 gridWidth = 8, gridHeight = 8,
                 arrows = listOf(
                     ArrowItem(1, listOf(GridPoint(2, 2), GridPoint(6, 2)), Direction.RIGHT),
@@ -29,7 +29,7 @@ object CuratedLevels {
             // Level 2: Zendai Route 2 - Corner Turns
             put(2, LevelData(
                 levelNumber = 2,
-                title = "City 1 • Route 2 • Gentle Turn",
+                title = "City 1 • Route 2 • Moon Path",
                 gridWidth = 8, gridHeight = 8,
                 arrows = listOf(
                     ArrowItem(1, listOf(GridPoint(2, 6), GridPoint(2, 2), GridPoint(6, 2)), Direction.RIGHT),
@@ -43,7 +43,7 @@ object CuratedLevels {
             // Level 3: Zendai Route 3 - Interlocking Square
             put(3, LevelData(
                 levelNumber = 3,
-                title = "City 1 • Route 3 • Quiet Path",
+                title = "City 1 • Route 3 • Satellite",
                 gridWidth = 9, gridHeight = 9,
                 arrows = listOf(
                     ArrowItem(1, listOf(GridPoint(2, 2), GridPoint(7, 2), GridPoint(7, 5)), Direction.DOWN),
@@ -58,7 +58,7 @@ object CuratedLevels {
             // Level 4: Zendai Route 4 - Windmill Cross
             put(4, LevelData(
                 levelNumber = 4,
-                title = "City 1 • Route 4 • Inner Calm",
+                title = "City 1 • Route 4 • Gravity Well",
                 gridWidth = 9, gridHeight = 9,
                 arrows = listOf(
                     ArrowItem(1, listOf(GridPoint(4, 2), GridPoint(4, 3), GridPoint(7, 3)), Direction.RIGHT),
@@ -71,10 +71,10 @@ object CuratedLevels {
                 maxDrops = 3, bannerText = "CALM MIND"
             ))
 
-            // ANCHOR 1: Level 5 (Zendai Route 5) - Zen Flow
+            // ANCHOR 1: Level 5 (Zendai Route 5) - Orbit
             put(5, LevelData(
                 levelNumber = 5,
-                title = "City 1 • Route 5 • Zen Flow",
+                title = "City 1 • Route 5 • Orbit",
                 gridWidth = 10, gridHeight = 10,
                 arrows = listOf(
                     ArrowItem(1, listOf(GridPoint(2, 2), GridPoint(8, 2), GridPoint(8, 7)), Direction.DOWN),
@@ -84,13 +84,13 @@ object CuratedLevels {
                     ArrowItem(5, listOf(GridPoint(1, 8), GridPoint(9, 8)), Direction.RIGHT),
                     ArrowItem(6, listOf(GridPoint(1, 1), GridPoint(1, 6)), Direction.DOWN)
                 ),
-                maxDrops = 3, isSilhouette = true, silhouetteIcon = "🌀", bannerText = "ZEN FLOW"
+                maxDrops = 3, isSilhouette = true, silhouetteIcon = "🌀", bannerText = "ORBIT"
             ))
 
-            // ANCHOR 2: Level 10 (Zendai Route 10) - Trophy of Clarity 🏆
+            // ANCHOR 2: Level 10 (Zendai Route 10) - Mars Transfer 🔴
             put(10, LevelData(
                 levelNumber = 10,
-                title = "City 1 • Route 10 • Trophy of Clarity 🏆",
+                title = "City 1 • Route 10 • Mars Transfer 🔴",
                 gridWidth = 14, gridHeight = 15,
                 arrows = listOf(
                     ArrowItem(1, listOf(GridPoint(3, 2), GridPoint(0, 2)), Direction.LEFT),
@@ -110,13 +110,13 @@ object CuratedLevels {
                     ArrowItem(15, listOf(GridPoint(2, 13), GridPoint(11, 13)), Direction.RIGHT),
                     ArrowItem(16, listOf(GridPoint(1, 14), GridPoint(12, 14)), Direction.RIGHT)
                 ),
-                maxDrops = 3, isSilhouette = true, silhouetteIcon = "🏆", bannerText = "TROPHY OF CLARITY"
+                maxDrops = 3, isSilhouette = true, silhouetteIcon = "🏆", bannerText = "MARS TRANSFER"
             ))
 
-            // ANCHOR 3: Level 15 (Zendai Route 15) - Diamond Heart 💎
+            // ANCHOR 3: Level 15 (Zendai Route 15) - Saturn Rings 🪐
             put(15, LevelData(
                 levelNumber = 15,
-                title = "City 1 • Route 15 • Diamond Heart 💎",
+                title = "City 1 • Route 15 • Saturn Rings 🪐",
                 gridWidth = 14, gridHeight = 14,
                 arrows = listOf(
                     ArrowItem(1, listOf(GridPoint(3, 2), GridPoint(5, 2)), Direction.RIGHT),
@@ -134,13 +134,13 @@ object CuratedLevels {
                     ArrowItem(13, listOf(GridPoint(7, 10), GridPoint(7, 12)), Direction.DOWN),
                     ArrowItem(14, listOf(GridPoint(1, 1), GridPoint(1, 4)), Direction.UP)
                 ),
-                maxDrops = 4, isSilhouette = true, silhouetteIcon = "💎", bannerText = "DIAMOND HEART"
+                maxDrops = 4, isSilhouette = true, silhouetteIcon = "💎", bannerText = "SATURN RINGS"
             ))
 
-            // ANCHOR 4: Level 20 (Zendai Route 20) - Zendai Gate ⛩️
+            // ANCHOR 4: Level 20 (Zendai Route 20) - SPACE MASTER 🚀
             put(20, LevelData(
                 levelNumber = 20,
-                title = "City 1 • Route 20 • Zendai Gate ⛩️",
+                title = "City 1 • Route 20 • SPACE MASTER 🚀",
                 gridWidth = 14, gridHeight = 14,
                 arrows = listOf(
                     ArrowItem(1, listOf(GridPoint(1, 1), GridPoint(12, 1)), Direction.RIGHT),
@@ -159,13 +159,13 @@ object CuratedLevels {
                     ArrowItem(14, listOf(GridPoint(3, 13), GridPoint(10, 13)), Direction.RIGHT),
                     ArrowItem(15, listOf(GridPoint(1, 12), GridPoint(1, 8)), Direction.UP)
                 ),
-                maxDrops = 4, isSilhouette = true, silhouetteIcon = "⛩️", bannerText = "ZENDAI GATE"
+                maxDrops = 4, isSilhouette = true, silhouetteIcon = "⛩️", bannerText = "SPACE MASTER"
             ))
 
-            // ANCHOR 5: Level 25 (Sandara Route 5) - Dune Run 🏜️
+            // ANCHOR 5: Level 25 (Sandara Route 5) - Momentum 🏃
             put(25, LevelData(
                 levelNumber = 25,
-                title = "City 2 • Route 5 • Dune Run 🏜️",
+                title = "City 2 • Route 5 • Momentum 🏃",
                 gridWidth = 13, gridHeight = 13,
                 arrows = listOf(
                     ArrowItem(1, listOf(GridPoint(5, 2), GridPoint(1, 2)), Direction.LEFT),
@@ -179,7 +179,7 @@ object CuratedLevels {
                     ArrowItem(9, listOf(GridPoint(10, 9), GridPoint(10, 11)), Direction.DOWN),
                     ArrowItem(10, listOf(GridPoint(3, 10), GridPoint(9, 10)), Direction.RIGHT)
                 ),
-                maxDrops = 4, isSilhouette = true, silhouetteIcon = "🏜️", bannerText = "DUNE RUN"
+                maxDrops = 4, isSilhouette = true, silhouetteIcon = "🏜️", bannerText = "MOMENTUM"
             ))
         }
     }

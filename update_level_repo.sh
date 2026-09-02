@@ -1,3 +1,4 @@
+cat << 'INNER_EOF' > app/src/main/java/com/example/engine/LevelRepository.kt
 package com.example.engine
 
 import com.example.model.LevelData
@@ -83,3 +84,4 @@ object LevelRepository {
 
     val featuredLevels = silhouetteLevels.map { it.levelNumber to "${it.title} ${it.icon}" }
 }
+INNER_EOF

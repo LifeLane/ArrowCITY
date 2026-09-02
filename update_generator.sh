@@ -1,3 +1,4 @@
+cat << 'INNER_EOF' > app/src/main/java/com/example/engine/ProceduralGenerator.kt
 package com.example.engine
 
 import com.example.engine.experimental.BlueprintGenerator
@@ -80,3 +81,4 @@ object ProceduralGenerator {
         }
     }
 }
+INNER_EOF

@@ -1,7 +1,7 @@
 package com.example.engine.experimental
 
 enum class DifficultyTier {
-    EASY, MEDIUM, HARD, DEEP
+    EASY, MEDIUM, HARD, DEEP, EXPERT, MASTER
 }
 
 data class StrategicBlueprint(
@@ -51,20 +51,44 @@ data class StrategicBlueprint(
         val DEEP = StrategicBlueprint(
             tier = DifficultyTier.DEEP,
             minDepth = 3,
-            maxDepth = 5,
+            maxDepth = 4,
             maxTraps = 4,
             recoveryAllowed = false,
             minSolutionLength = 20,
             maxSolutionLength = 40,
             maxRepetitiveRatio = 0.75f
         )
+
+        val EXPERT = StrategicBlueprint(
+            tier = DifficultyTier.EXPERT,
+            minDepth = 4,
+            maxDepth = 5,
+            maxTraps = 4,
+            recoveryAllowed = false,
+            minSolutionLength = 20,
+            maxSolutionLength = 45,
+            maxRepetitiveRatio = 0.70f
+        )
+
+        val MASTER = StrategicBlueprint(
+            tier = DifficultyTier.MASTER,
+            minDepth = 5,
+            maxDepth = 6,
+            maxTraps = 5,
+            recoveryAllowed = false,
+            minSolutionLength = 25,
+            maxSolutionLength = 50,
+            maxRepetitiveRatio = 0.60f
+        )
         
         fun forLevel(levelNumber: Int): StrategicBlueprint {
             return when {
-                levelNumber <= 25 -> EASY
-                levelNumber <= 75 -> MEDIUM
-                levelNumber <= 125 -> HARD
-                else -> DEEP
+                levelNumber <= 10 -> EASY
+                levelNumber <= 30 -> MEDIUM
+                levelNumber <= 80 -> HARD
+                levelNumber <= 140 -> DEEP
+                levelNumber <= 180 -> EXPERT
+                else -> MASTER
             }
         }
     }

@@ -1,3 +1,4 @@
+cat << 'INNER_EOF' > app/src/main/java/com/example/model/CityModels.kt
 package com.example.model
 
 /**
@@ -194,3 +195,4 @@ object CityRepository {
         return route == 5 || route == 10 || route == 15 || route == 20
     }
 }
+INNER_EOF
