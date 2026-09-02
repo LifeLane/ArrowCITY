@@ -79,6 +79,7 @@ import com.example.viewmodel.GameUiState
 fun MainHomeScreen(
     uiState: GameUiState,
     onContinueGame: () -> Unit,
+    onOpenSpaceCityMap: () -> Unit = {},
     onOpenLevelSelect: () -> Unit,
     onOpenDailyChallenge: () -> Unit,
     onOpenStats: () -> Unit,
@@ -381,6 +382,45 @@ fun MainHomeScreen(
                             fontSize = 16.sp,
                             fontWeight = FontWeight.ExtraBold,
                             letterSpacing = 1.sp
+                        )
+                    }
+                }
+
+                // Dedicated Space City Map Button
+                Button(
+                    onClick = onOpenSpaceCityMap,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color.Transparent
+                    ),
+                    shape = RoundedCornerShape(24.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(54.dp)
+                        .background(
+                            brush = Brush.horizontalGradient(
+                                colors = listOf(
+                                    Color(0xFF6C5CE7),
+                                    Color(0xFF00CEC9),
+                                    Color(0xFF0984E3)
+                                )
+                            ),
+                            shape = RoundedCornerShape(24.dp)
+                        )
+                        .shadow(8.dp, RoundedCornerShape(24.dp))
+                        .testTag("home_space_city_map_button")
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Text(text = "🚀", fontSize = 20.sp)
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text(
+                            text = "SPACE CITY MAP (20 LEVELS)",
+                            color = Color.White,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Black,
+                            letterSpacing = 0.8.sp
                         )
                     }
                 }

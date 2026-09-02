@@ -19,6 +19,10 @@ object LevelRepository {
      * Retrieves LevelData for any level 1 to 200 (or beyond).
      */
     fun getLevel(levelNumber: Int): LevelData {
+        if (levelNumber in 1..20) {
+            val spaceLevel = com.example.content.cities.SpaceCityLevels.getLevel(levelNumber)
+            if (spaceLevel != null) return spaceLevel
+        }
         return PublishedBetaLevels.levels[levelNumber]
             ?: CuratedLevels.curatedMap[levelNumber]
             ?: ProceduralGenerator.generateLevel(levelNumber)

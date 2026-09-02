@@ -74,6 +74,8 @@ data class GameUiState(
     val isAboutOpen: Boolean = false,
     val isVipRewardsOpen: Boolean = false,
     val isBetaCompletedOpen: Boolean = false,
+    val isSpaceCityMapOpen: Boolean = false,
+    val isSpaceCityCompletedOpen: Boolean = false,
     val selectedTheme: GameTheme = GameThemes.EyeComfort,
     val equippedArrowSkin: ArrowSkinType = ArrowSkinType.DEFAULT,
     val equippedBoardCanvas: BoardCanvasType = BoardCanvasType.DEFAULT,
@@ -385,6 +387,10 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun nextLevel() {
+        if (_uiState.value.currentLevelNumber == 20) {
+            _uiState.update { it.copy(isLevelCompleted = false, isSpaceCityCompletedOpen = true) }
+            return
+        }
         if (_uiState.value.currentLevelNumber >= 200) {
             _uiState.update { it.copy(isLevelCompleted = false, isBetaCompletedOpen = true) }
             return
@@ -392,6 +398,14 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         val next = _uiState.value.currentLevelNumber + 1
         unlockLevel(next)
         loadLevel(next)
+    }
+
+    fun openSpaceCityMap(open: Boolean) {
+        _uiState.update { it.copy(isSpaceCityMapOpen = open) }
+    }
+
+    fun openSpaceCityCompleted(open: Boolean) {
+        _uiState.update { it.copy(isSpaceCityCompletedOpen = open) }
     }
     
     fun closeBetaCompleted() {

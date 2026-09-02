@@ -28,6 +28,7 @@ import com.example.ui.components.LevelFailedDialog
 import com.example.ui.components.LevelSelectDialog
 import com.example.ui.components.BetaCompleteDialog
 import com.example.ui.components.SettingsDialog
+import com.example.ui.components.SpaceCityCompletionDialog
 import com.example.ui.components.StatisticsDialog
 import com.example.ui.components.ThemeSelectDialog
 import com.example.ui.components.VipRewardsDialog
@@ -49,11 +50,28 @@ fun GameScreen(
             theme = theme,
             onBack = { viewModel.openExperimental(false) }
         )
+    } else if (uiState.isSpaceCityMapOpen) {
+        SpaceCityMapScreen(
+            highestUnlockedLevel = uiState.highestUnlockedLevel,
+            completedLevelsStars = uiState.completedLevelsStars,
+            currentLevelNumber = uiState.currentLevelNumber,
+            onLevelSelected = { levelNum ->
+                viewModel.loadLevel(levelNum)
+                viewModel.openSpaceCityMap(false)
+                viewModel.setMainMenuActive(false)
+            },
+            onBackToHome = {
+                viewModel.openSpaceCityMap(false)
+            }
+        )
     } else if (uiState.isMainMenuActive) {
         MainHomeScreen(
             uiState = uiState,
             onContinueGame = {
                 viewModel.setMainMenuActive(false)
+            },
+            onOpenSpaceCityMap = {
+                viewModel.openSpaceCityMap(true)
             },
             onOpenLevelSelect = {
                 viewModel.openLevelSelect(true)
@@ -160,6 +178,21 @@ fun GameScreen(
         BetaCompleteDialog(
             uiState = uiState,
             onDismiss = { viewModel.closeBetaCompleted() }
+        )
+    }
+
+    if (uiState.isSpaceCityCompletedOpen) {
+        SpaceCityCompletionDialog(
+            totalStarsEarned = (1..20).sumOf { uiState.completedLevelsStars[it] ?: 0 },
+            onReplayCity = {
+                viewModel.openSpaceCityCompleted(false)
+                viewModel.loadLevel(1)
+                viewModel.setMainMenuActive(false)
+            },
+            onReturnToMap = {
+                viewModel.openSpaceCityCompleted(false)
+                viewModel.openSpaceCityMap(true)
+            }
         )
     }
 
