@@ -7,6 +7,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.audio.SoundManager
+import com.example.engine.GameEngine
+import com.example.engine.CurrentGameEngine
+import com.example.engine.MoveResult
 import com.example.engine.LevelRepository
 import com.example.engine.PuzzleSolver
 import com.example.model.ArrowItem
@@ -113,6 +116,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     private val database = com.example.data.AppDatabase.getDatabase(application)
     private val repository = com.example.data.GameRepository(database.levelProgressDao())
     val soundManager = SoundManager(application)
+    private val gameEngine: GameEngine = CurrentGameEngine()
     private val random = Random()
 
     private val _uiState = MutableStateFlow(GameUiState())
@@ -422,18 +426,22 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         // Save history state before executing move for Recall
         pushMoveHistory()
 
-        // Check if collision occurs
-        val collision = PuzzleSolver.checkCollision(
-            arrow = currentArrow,
+        val moveResult = gameEngine.processPlayerAction(
+            actionArrow = currentArrow,
             activeArrows = state.activeArrows,
-            gridWidth = state.levelData.gridWidth,
-            gridHeight = state.levelData.gridHeight
+            levelData = state.levelData
         )
 
-        if (collision != null) {
-            handleArrowBlocked(currentArrow, collision)
-        } else {
-            handleArrowClear(currentArrow)
+        when (moveResult) {
+            is MoveResult.Invalid -> {
+                handleArrowBlocked(currentArrow, moveResult.collision)
+            }
+            is MoveResult.Valid -> {
+                handleArrowClear(currentArrow)
+            }
+            is MoveResult.Complete -> {
+                handleArrowClear(currentArrow)
+            }
         }
     }
 
