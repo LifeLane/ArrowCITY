@@ -21,11 +21,7 @@ object LevelRepository {
     fun getLevel(levelNumber: Int): LevelData {
         return PublishedBetaLevels.levels[levelNumber]
             ?: CuratedLevels.curatedMap[levelNumber]
-            ?: if (isAnchorLevel(levelNumber)) {
-                ProceduralGenerator.generateAnchorLevel(levelNumber)
-            } else {
-                ProceduralGenerator.generateLevel(levelNumber)
-            }
+            ?: ProceduralGenerator.generateLevel(levelNumber)
     }
 
     /**

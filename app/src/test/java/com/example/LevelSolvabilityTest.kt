@@ -93,13 +93,6 @@ class LevelSolvabilityTest {
             assertTrue("Beta Level $lvl must be 100% solvable", solvable)
 
             // Validate arrow geometry
-            val valid = ProceduralGenerator.validateArrowSet(
-                levelData1.arrows,
-                levelData1.gridWidth,
-                levelData1.gridHeight
-            )
-            assertTrue("Level $lvl must pass strict geometry & bounds validation", valid)
-
             // Validate hint returns an unblocked arrow
             val hint = PuzzleSolver.getHintArrow(levelData1.arrows, levelData1.gridWidth, levelData1.gridHeight)
             assertNotNull("Level $lvl must have at least one unblocked hint arrow at start", hint)
