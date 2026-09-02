@@ -57,6 +57,18 @@ jobs:
           KEY_ALIAS: ${{ secrets.KEY_ALIAS || 'upload' }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD || 'android' }}
         run: |
+          if [ -f "$KEYSTORE_PATH" ]; then
+            echo "--- KEYSTORE DEBUG INFO ---"
+            echo "Attempting to auto-detect alias from keystore..."
+            REAL_ALIAS=$(keytool -list -keystore "$KEYSTORE_PATH" -storepass "$STORE_PASSWORD" | grep "Alias name:" | head -n 1 | awk -F': ' '{print $2}' | tr -d ' \r\n')
+            if [ -n "$REAL_ALIAS" ]; then
+              echo "Auto-detected Keystore Alias: $REAL_ALIAS"
+              export KEY_ALIAS="$REAL_ALIAS"
+            else
+              echo "Could not auto-detect alias. Check your STORE_PASSWORD."
+            fi
+            echo "---------------------------"
+          fi
           ./gradlew clean bundleRelease assembleRelease --stacktrace
 
       - name: Upload Release AAB (Google Play Beta)
