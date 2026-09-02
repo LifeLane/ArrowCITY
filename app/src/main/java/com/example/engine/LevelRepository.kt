@@ -19,7 +19,8 @@ object LevelRepository {
      * Retrieves LevelData for any level 1 to 200 (or beyond).
      */
     fun getLevel(levelNumber: Int): LevelData {
-        return CuratedLevels.curatedMap[levelNumber]
+        return PublishedBetaLevels.levels[levelNumber]
+            ?: CuratedLevels.curatedMap[levelNumber]
             ?: if (isAnchorLevel(levelNumber)) {
                 ProceduralGenerator.generateAnchorLevel(levelNumber)
             } else {

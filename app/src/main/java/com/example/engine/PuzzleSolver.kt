@@ -173,61 +173,174 @@ object PuzzleSolver {
 
     data class PuzzleMetrics(
         val solvable: Boolean,
-        val solutionMoves: Int,
+        val minimumMoves: Int,
+        val maximumSearchDepth: Int,
+        val forcedMoveCount: Int,
+        val decisionCount: Int,
+        val initialLegalMoves: Int,
+        val criticalPath: Int,
+        val branchingFactor: Float,
+        val deadEndCount: Int,
         val dependencyDepth: Int,
-        val initiallyUnblocked: Int,
-        val maxBlockingChain: Int,
-        val arrowCount: Int,
-        val averageRouteLength: Float,
-        val longestRoute: Float,
-        val branchingFactor: Float
+        val initiallyUnblocked: Int = initialLegalMoves,
+        val maxBlockingChain: Int = dependencyDepth,
+        val arrowCount: Int = if (solvable) minimumMoves else 0,
+        val solutionMoves: Int = arrowCount,
+        val averageRouteLength: Float = 0f,
+        val longestRoute: Float = 0f
     )
+
+    fun buildDependencyGraph(
+        arrows: List<ArrowItem>,
+        gridWidth: Int,
+        gridHeight: Int
+    ): Map<Int, Set<Int>> {
+        val graph = mutableMapOf<Int, Set<Int>>()
+        val occupancy = buildOccupancyMap(arrows)
+        
+        for (arrow in arrows) {
+            val blockedBy = mutableSetOf<Int>()
+            val dir = arrow.headDirection
+            var current = arrow.head.plus(dir)
+            val maxSteps = maxOf(gridWidth, gridHeight) * 2 + 5
+            var steps = 0
+            
+            while (steps < maxSteps) {
+                if (current.x < 0 || current.x >= gridWidth || current.y < 0 || current.y >= gridHeight) {
+                    break
+                }
+                val blocker = occupancy[current]
+                if (blocker != null && blocker.id != arrow.id) {
+                    blockedBy.add(blocker.id)
+                }
+                current = current.plus(dir)
+                steps++
+            }
+            graph[arrow.id] = blockedBy
+        }
+        return graph
+    }
+
+    fun getLongestPathLength(graph: Map<Int, Set<Int>>): Int {
+        val memo = mutableMapOf<Int, Int>()
+        val visiting = mutableSetOf<Int>()
+        var cycleDetected = false
+        
+        fun dfs(node: Int): Int {
+            if (cycleDetected) return 0
+            if (node in memo) return memo[node]!!
+            if (node in visiting) {
+                cycleDetected = true
+                return 0
+            }
+            visiting.add(node)
+            val neighbors = graph[node] ?: emptySet()
+            var maxSub = 0
+            for (neighbor in neighbors) {
+                maxSub = maxOf(maxSub, 1 + dfs(neighbor))
+            }
+            visiting.remove(node)
+            memo[node] = maxSub
+            return maxSub
+        }
+        
+        var maxPath = 0
+        for (node in graph.keys) {
+            maxPath = maxOf(maxPath, dfs(node))
+            if (cycleDetected) return -1
+        }
+        return maxPath
+    }
 
     fun analyzePuzzle(
         initialArrows: List<ArrowItem>,
         gridWidth: Int,
         gridHeight: Int
     ): PuzzleMetrics {
-        var remaining = initialArrows.toList()
-        var dependencyDepth = 0
-        var solutionMoves = 0
-        var initiallyUnblocked = 0
-        var maxBranching = 0
-        val totalArrows = initialArrows.size
+        val graph = buildDependencyGraph(initialArrows, gridWidth, gridHeight)
+        val criticalPath = getLongestPathLength(graph)
+        val initialIds = initialArrows.map { it.id }.toSet()
         
-        var solvable = true
+        val visited = mutableSetOf<Set<Int>>()
+        val queue = ArrayDeque<Set<Int>>()
         
-        while (remaining.isNotEmpty()) {
-            val unblocked = findUnblockedArrows(remaining, gridWidth, gridHeight)
-            if (unblocked.isEmpty()) {
-                solvable = false
-                break
-            }
-            if (dependencyDepth == 0) {
-                initiallyUnblocked = unblocked.size
-            }
-            maxBranching = maxOf(maxBranching, unblocked.size)
+        queue.add(initialIds)
+        visited.add(initialIds)
+        
+        var solvable = criticalPath >= 0
+        var maxDepthExplored = 0
+        var forcedMoveCount = 0
+        var decisionCount = 0
+        var deadEndCount = 0
+        var totalBranching = 0
+        var reachableNonEmptyCount = 0
+        
+        val maxStatesLimit = 5000
+        
+        while (queue.isNotEmpty() && visited.size < maxStatesLimit) {
+            val state = queue.removeFirst()
             
-            // Remove all unblocked (to calculate depth of dependencies)
-            val unblockedIds = unblocked.map { it.id }.toSet()
-            remaining = remaining.filter { it.id !in unblockedIds }
-            dependencyDepth++
-            solutionMoves += unblocked.size
+            if (state.isEmpty()) {
+                solvable = true
+                continue
+            }
+            
+            val unblocked = state.filter { id ->
+                val blockers = graph[id] ?: emptySet()
+                blockers.none { it in state }
+            }
+            
+            reachableNonEmptyCount++
+            totalBranching += unblocked.size
+            
+            when {
+                unblocked.isEmpty() -> deadEndCount++
+                unblocked.size == 1 -> forcedMoveCount++
+                unblocked.size >= 2 -> decisionCount++
+            }
+            
+            val depth = initialIds.size - state.size
+            if (depth > maxDepthExplored) {
+                maxDepthExplored = depth
+            }
+            
+            for (id in unblocked) {
+                val nextState = state.filter { it != id }.toSet()
+                if (nextState !in visited) {
+                    visited.add(nextState)
+                    queue.add(nextState)
+                }
+            }
+        }
+        
+        val initialUnblocked = initialIds.filter { id ->
+            val blockers = graph[id] ?: emptySet()
+            blockers.none { it in initialIds }
+        }.size
+        
+        val avgBranchingFactor = if (reachableNonEmptyCount > 0) {
+            totalBranching.toFloat() / reachableNonEmptyCount
+        } else {
+            0f
         }
         
         val avgLen = if (initialArrows.isNotEmpty()) initialArrows.map { it.totalLength() }.average().toFloat() else 0f
         val maxLen = if (initialArrows.isNotEmpty()) initialArrows.map { it.totalLength() }.maxOrNull() ?: 0f else 0f
-
+        val dependencyDepth = if (criticalPath >= 0) criticalPath else 0
+        
         return PuzzleMetrics(
             solvable = solvable,
-            solutionMoves = totalArrows,
+            minimumMoves = if (solvable) initialArrows.size else -1,
+            maximumSearchDepth = maxDepthExplored,
+            forcedMoveCount = forcedMoveCount,
+            decisionCount = decisionCount,
+            initialLegalMoves = initialUnblocked,
+            criticalPath = dependencyDepth,
+            branchingFactor = avgBranchingFactor,
+            deadEndCount = deadEndCount,
             dependencyDepth = dependencyDepth,
-            initiallyUnblocked = initiallyUnblocked,
-            maxBlockingChain = dependencyDepth, 
-            arrowCount = totalArrows,
             averageRouteLength = avgLen,
-            longestRoute = maxLen,
-            branchingFactor = maxBranching.toFloat()
+            longestRoute = maxLen
         )
     }
 }
