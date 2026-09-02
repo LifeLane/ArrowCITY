@@ -37,6 +37,7 @@ import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.GridView
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.PlayArrow
+import androidx.compose.material.icons.outlined.Science
 import androidx.compose.material.icons.outlined.SelfImprovement
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Button
@@ -86,6 +87,7 @@ fun MainHomeScreen(
     onOpenSettings: () -> Unit,
     onOpenVipRewards: () -> Unit,
     onOpenAbout: () -> Unit,
+    onOpenExperimental: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val theme = uiState.selectedTheme
@@ -418,6 +420,15 @@ fun MainHomeScreen(
                     theme = theme,
                     onClick = onOpenStore,
                     testTag = "home_store_button"
+                )
+
+                // Experimental
+                MenuButton(
+                    title = "EXPERIMENTAL / STEP SLIDE",
+                    icon = Icons.Outlined.Science,
+                    theme = theme,
+                    onClick = onOpenExperimental,
+                    testTag = "home_experimental_button"
                 )
             }
 

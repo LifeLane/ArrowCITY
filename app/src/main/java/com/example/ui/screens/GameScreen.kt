@@ -15,6 +15,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.ui.components.AboutInfoDialog
 import com.example.ui.components.AmazeGameBoard
 import com.example.ui.components.CosmeticStoreDialog
@@ -41,7 +42,14 @@ fun GameScreen(
     val uiState by viewModel.uiState.collectAsState()
     val theme = uiState.selectedTheme
 
-    if (uiState.isMainMenuActive) {
+    if (uiState.isExperimentalActive) {
+        val prototypeViewModel: com.example.viewmodel.StepSlidePrototypeViewModel = viewModel()
+        StepSlidePrototypeScreen(
+            viewModel = prototypeViewModel,
+            theme = theme,
+            onBack = { viewModel.openExperimental(false) }
+        )
+    } else if (uiState.isMainMenuActive) {
         MainHomeScreen(
             uiState = uiState,
             onContinueGame = {
@@ -70,6 +78,9 @@ fun GameScreen(
             },
             onOpenAbout = {
                 viewModel.openAbout(true)
+            },
+            onOpenExperimental = {
+                viewModel.openExperimental(true)
             },
             modifier = modifier
         )

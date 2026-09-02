@@ -8,30 +8,34 @@ import org.junit.Test
 class PrototypePrinterTest {
     @Test
     fun printPrototypes() {
-        val generator = StepPuzzleGenerator()
-        val seedsAndTargets = listOf(
-            Triple("Prototype A - Tutorial", 1234L, 0),
-            Triple("Prototype B - Basic planning", 5678L, 1),
-            Triple("Prototype C - Intermediate", 9999L, 2),
-            Triple("Prototype D - Advanced prototype", 7777L, 3)
+        val fixtures = listOf(
+            "Prototype A - Tutorial" to com.example.engine.experimental.StepPuzzleFixtures.prototypeA,
+            "Prototype B - Basic planning" to com.example.engine.experimental.StepPuzzleFixtures.prototypeB,
+            "Prototype C - Intermediate" to com.example.engine.experimental.StepPuzzleFixtures.prototypeC,
+            "Prototype D - Advanced prototype" to com.example.engine.experimental.StepPuzzleFixtures.prototypeD
         )
         
-        for ((name, seed, target) in seedsAndTargets) {
-            val state = generator.generatePrototype(seed, target)
+        for ((name, state) in fixtures) {
             val analyzer = StepPuzzleAnalyzer(StepSlideEngine(5, 5), state)
             val metrics = analyzer.analyze()
             
-            val initialMoves = StepSlideEngine(5, 5).getAvailableMoves(state).size
             val arrowCount = state.arrows.size
             
             println("=== $name ===")
             println("Arrow count: $arrowCount")
-            println("Initial legal moves: $initialMoves")
-            println("Choice states: ${metrics.choiceStates}")
+            println("Initial legal moves: ${metrics.initialLegalMoves}")
+            println("Total reachable states: ${metrics.reachableStateCount}")
+            println("Choice states: ${analyzer.choiceStates}")
             println("Critical choices: ${metrics.criticalChoices}")
             println("Dead ends: ${metrics.deadEndCount}")
-            println("Minimum solution length: ${metrics.minimumMoves}")
-            println("Reasoning depth: ${metrics.reasoningDepth}")
+            println("Minimum solution length: ${metrics.minimumSolutionLength}")
+            println("Maximum solution length: ${metrics.maximumSolutionLength}")
+            println("Maximum branching factor: ${metrics.maximumBranchingFactor}")
+            println("Strategic decision depth: ${metrics.strategicDepth}")
+            println("Trap Severity: ${metrics.trapSeverity}")
+            println("Decision Density: ${metrics.decisionDensity}")
+            println("Recovery Potential: ${metrics.recoveryPotential}")
+            println("Repetitive Move Ratio: ${metrics.repetitiveMoveRatio}")
             println("Successful paths: ${metrics.successfulPaths}")
             println("Failed paths: ${metrics.failedPaths}")
             println()

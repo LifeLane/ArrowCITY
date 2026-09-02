@@ -45,6 +45,7 @@ data class FlyingArrow(
 
 data class GameUiState(
     val isMainMenuActive: Boolean = true,
+    val isExperimentalActive: Boolean = false,
     val currentLevelNumber: Int = 1,
     val levelData: LevelData = LevelRepository.getLevel(1),
     val activeArrows: List<ArrowItem> = emptyList(),
@@ -934,6 +935,10 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         soundManager.isHapticEnabled = enabled
         prefs.edit().putBoolean("haptic_enabled", enabled).apply()
         _uiState.update { it.copy(hapticEnabled = enabled) }
+    }
+
+    fun openExperimental(open: Boolean) {
+        _uiState.update { it.copy(isExperimentalActive = open, isMainMenuActive = !open) }
     }
 
     fun setMainMenuActive(active: Boolean) {
