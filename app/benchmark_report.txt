@@ -1,0 +1,20 @@
+=== GENERATOR BENCHMARK ===
+
+--- NEW CONSTRUCTIVE GENERATOR ---
+Tier EASY: Avg Time=5ms, Avg Attempts=3, Success Rate=5/5
+Tier MEDIUM Seed 1 failed: Failed to constructively generate puzzle for tier MEDIUM after 1001 attempts and 5121ms
+Tier MEDIUM Seed 3 failed: Failed to constructively generate puzzle for tier MEDIUM after 1201 attempts and 5010ms
+Tier MEDIUM: Avg Time=1636ms, Avg Attempts=273, Success Rate=3/5
+Tier HARD Seed 1 failed: Failed to constructively generate puzzle for tier HARD after 1342 attempts and 5120ms
+Tier HARD Seed 2 failed: Failed to constructively generate puzzle for tier HARD after 1424 attempts and 5002ms
+Tier HARD Seed 3 failed: Failed to constructively generate puzzle for tier HARD after 1467 attempts and 5030ms
+Tier HARD Seed 4 failed: Failed to constructively generate puzzle for tier HARD after 1694 attempts and 5084ms
+Tier HARD Seed 5 failed: Failed to constructively generate puzzle for tier HARD after 1280 attempts and 5009ms
+Tier DEEP Seed 1 failed: Failed to constructively generate puzzle for tier DEEP after 1085 attempts and 5006ms
+Tier DEEP Seed 2 failed: Failed to constructively generate puzzle for tier DEEP after 683 attempts and 5000ms
+Tier DEEP Seed 3 failed: Failed to constructively generate puzzle for tier DEEP after 1244 attempts and 5518ms
+Tier DEEP Seed 4 failed: Failed to constructively generate puzzle for tier DEEP after 1252 attempts and 5000ms
+Tier DEEP Seed 5 failed: Failed to constructively generate puzzle for tier DEEP after 1007 attempts and 5066ms
+
+--- OLD PROCEDURAL GENERATOR ---
+Old Gen: Avg Time=35ms for 20 levels

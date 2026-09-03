@@ -27,6 +27,10 @@ import com.example.model.MoveHistoryState
 import com.example.model.PowerUpType
 import com.example.model.ShockwaveRing
 import com.example.model.SoftDustParticle
+import com.example.engine.BrainTeaserEngine
+import com.example.model.BrainTeaserDifficulty
+import com.example.model.CognitiveProfile
+import com.example.model.StrategicHint
 import com.example.ui.theme.GameThemes
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -107,7 +111,14 @@ data class GameUiState(
     val impactSparks: List<ImpactSpark> = emptyList(),
     val softDustParticles: List<SoftDustParticle> = emptyList(),
     val shockwaves: List<ShockwaveRing> = emptyList(),
-    val moveHistory: List<MoveHistoryState> = emptyList()
+    val moveHistory: List<MoveHistoryState> = emptyList(),
+    val cognitiveProfile: CognitiveProfile? = null,
+    val isInspectorModeActive: Boolean = false,
+    val selectedArrowForInspector: ArrowItem? = null,
+    val activeStrategicHint: StrategicHint? = null,
+    val isCognitiveSheetOpen: Boolean = false,
+    val isBrainTeaserLabOpen: Boolean = false,
+    val isAutoSolveRunning: Boolean = false
 ) {
     val totalStars: Int
         get() = completedLevelsStars.values.sum()
@@ -217,9 +228,17 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             // Ensure highest Room is clamped up to the actual level and currentLvl
             highestRoom = maxOf(highestRoom, currentLvl)
             
+            val initialLevel = LevelRepository.getLevel(currentLvl)
+            val initialCognitive = BrainTeaserEngine.analyzeCognitiveProfile(initialLevel, initialLevel.arrows)
+
             _uiState.update {
                 it.copy(
                     currentLevelNumber = currentLvl,
+                    levelData = initialLevel,
+                    activeArrows = initialLevel.arrows,
+                    remainingDrops = initialLevel.maxDrops,
+                    maxDrops = initialLevel.maxDrops,
+                    cognitiveProfile = initialCognitive,
                     highestUnlockedLevel = highestRoom,
                     completedLevelsStars = starsMap,
                     totalPuzzlesSolved = solvedRoom,
@@ -304,6 +323,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             PowerUpType.MAGNET to maxOf(currentPowers[PowerUpType.MAGNET] ?: 0, 2),
             PowerUpType.RECALL to maxOf(currentPowers[PowerUpType.RECALL] ?: 0, 3)
         )
+        val cognitive = BrainTeaserEngine.analyzeCognitiveProfile(freshLevel, freshLevel.arrows)
 
         _uiState.update {
             it.copy(
@@ -326,7 +346,10 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 impactSparks = emptyList(),
                 softDustParticles = emptyList(),
                 shockwaves = emptyList(),
-                moveHistory = emptyList()
+                moveHistory = emptyList(),
+                cognitiveProfile = cognitive,
+                activeStrategicHint = null,
+                isAutoSolveRunning = false
             )
         }
     }
@@ -361,6 +384,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             PowerUpType.MAGNET to maxOf(currentPowers[PowerUpType.MAGNET] ?: 0, 2),
             PowerUpType.RECALL to maxOf(currentPowers[PowerUpType.RECALL] ?: 0, 3)
         )
+        val cognitive = BrainTeaserEngine.analyzeCognitiveProfile(level, level.arrows)
 
         _uiState.update {
             it.copy(
@@ -381,7 +405,10 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 impactSparks = emptyList(),
                 softDustParticles = emptyList(),
                 shockwaves = emptyList(),
-                moveHistory = emptyList()
+                moveHistory = emptyList(),
+                cognitiveProfile = cognitive,
+                activeStrategicHint = null,
+                isAutoSolveRunning = false
             )
         }
     }
@@ -552,6 +579,9 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
 
         // Generate soft ASMR dust particles along the arrow line and arrowhead
         val newDustParticles = generateSoftDustParticles(arrow, state.selectedTheme)
+        val remainingCognitive = if (remainingActive.isNotEmpty()) {
+            BrainTeaserEngine.analyzeCognitiveProfile(state.levelData, remainingActive)
+        } else null
 
         _uiState.update {
             it.copy(
@@ -563,7 +593,9 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 comboReward = newComboReward ?: it.comboReward,
                 powerUpsRemaining = updatedPowers,
                 softDustParticles = (it.softDustParticles.filter { p -> now - p.createdAt < p.maxAgeMs } + newDustParticles).takeLast(45),
-                hintArrowId = if (it.hintArrowId == arrow.id) null else it.hintArrowId
+                hintArrowId = if (it.hintArrowId == arrow.id) null else it.hintArrowId,
+                cognitiveProfile = remainingCognitive,
+                activeStrategicHint = if (it.activeStrategicHint?.recommendedArrowId == arrow.id) null else it.activeStrategicHint
             )
         }
 
@@ -850,6 +882,136 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    private var autoSolveJob: Job? = null
+
+    fun toggleInspectorMode() {
+        soundManager.playTap()
+        _uiState.update { it.copy(isInspectorModeActive = !it.isInspectorModeActive) }
+    }
+
+    fun selectArrowForInspector(arrow: ArrowItem?) {
+        _uiState.update { it.copy(selectedArrowForInspector = arrow) }
+    }
+
+    fun openCognitiveSheet(open: Boolean) {
+        soundManager.playTap()
+        _uiState.update { it.copy(isCognitiveSheetOpen = open) }
+    }
+
+    fun openBrainTeaserLab(open: Boolean) {
+        soundManager.playTap()
+        _uiState.update { it.copy(isBrainTeaserLabOpen = open) }
+    }
+
+    fun generateAndPlayBrainTeaser(difficulty: BrainTeaserDifficulty, customSeed: Long? = null) {
+        val seed = customSeed ?: System.currentTimeMillis()
+        val customLevel = BrainTeaserEngine.generateProceduralBrainTeaser(difficulty, seed)
+        levelStartTime = System.currentTimeMillis()
+        completionHandled = false
+        autoSolveJob?.cancel()
+
+        val cognitive = BrainTeaserEngine.analyzeCognitiveProfile(customLevel, customLevel.arrows)
+
+        _uiState.update {
+            it.copy(
+                currentLevelNumber = customLevel.levelNumber,
+                levelData = customLevel,
+                activeArrows = customLevel.arrows,
+                flyingArrows = emptyList(),
+                remainingDrops = customLevel.maxDrops,
+                maxDrops = customLevel.maxDrops,
+                movesCount = 0,
+                hintArrowId = null,
+                guidanceArrowId = null,
+                collisionInfo = null,
+                isLevelCompleted = false,
+                isLevelFailed = false,
+                isMainMenuActive = false,
+                isBrainTeaserLabOpen = false,
+                cognitiveProfile = cognitive,
+                activeStrategicHint = null,
+                moveHistory = emptyList(),
+                isAutoSolveRunning = false
+            )
+        }
+        soundManager.playWhoosh(1)
+    }
+
+    fun stepAutoSolve() {
+        val state = _uiState.value
+        if (state.isLevelCompleted || state.isLevelFailed) return
+
+        val optimalSequence = BrainTeaserEngine.computeOptimalSolution(
+            state.activeArrows,
+            state.levelData.gridWidth,
+            state.levelData.gridHeight
+        )
+
+        if (optimalSequence.isNotEmpty()) {
+            val nextArrowId = optimalSequence.first()
+            val arrowToClear = state.activeArrows.firstOrNull { it.id == nextArrowId }
+            if (arrowToClear != null) {
+                onArrowTapped(arrowToClear)
+            }
+        }
+    }
+
+    fun toggleAutoSolve() {
+        if (_uiState.value.isAutoSolveRunning) {
+            autoSolveJob?.cancel()
+            autoSolveJob = null
+            _uiState.update { it.copy(isAutoSolveRunning = false) }
+            soundManager.playTap()
+        } else {
+            soundManager.playTap()
+            _uiState.update { it.copy(isAutoSolveRunning = true) }
+            autoSolveJob?.cancel()
+            autoSolveJob = viewModelScope.launch {
+                while (_uiState.value.isAutoSolveRunning && _uiState.value.activeArrows.isNotEmpty() && !_uiState.value.isLevelCompleted && !_uiState.value.isLevelFailed) {
+                    val optimalSequence = BrainTeaserEngine.computeOptimalSolution(
+                        _uiState.value.activeArrows,
+                        _uiState.value.levelData.gridWidth,
+                        _uiState.value.levelData.gridHeight
+                    )
+                    if (optimalSequence.isEmpty()) break
+
+                    val nextArrowId = optimalSequence.first()
+                    val arrowToClear = _uiState.value.activeArrows.firstOrNull { it.id == nextArrowId } ?: break
+                    onArrowTapped(arrowToClear)
+                    delay(550)
+                }
+                _uiState.update { it.copy(isAutoSolveRunning = false) }
+            }
+        }
+    }
+
+    fun undoLastMove() {
+        val state = _uiState.value
+        if (state.moveHistory.isNotEmpty()) {
+            soundManager.playRecall()
+            val lastState = state.moveHistory.last()
+            val newHistory = state.moveHistory.dropLast(1)
+            val updatedCognitive = BrainTeaserEngine.analyzeCognitiveProfile(state.levelData, lastState.activeArrows)
+
+            _uiState.update {
+                it.copy(
+                    activeArrows = lastState.activeArrows,
+                    remainingDrops = maxOf(it.remainingDrops, lastState.remainingDrops),
+                    movesCount = maxOf(0, lastState.movesCount),
+                    moveHistory = newHistory,
+                    isLevelFailed = false,
+                    collisionInfo = null,
+                    cognitiveProfile = updatedCognitive,
+                    activeStrategicHint = null
+                )
+            }
+        }
+    }
+
+    fun dismissStrategicHint() {
+        _uiState.update { it.copy(activeStrategicHint = null, hintArrowId = null) }
+    }
+
     fun useHint() {
         val state = _uiState.value
         if (state.isLevelCompleted || state.isLevelFailed) return
@@ -858,28 +1020,53 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             prefs.edit().putInt("hints_count", 3).apply()
         }
 
-        val hintArrow = PuzzleSolver.getHintArrow(
+        val advisorHint = BrainTeaserEngine.getStrategicAdvisorHint(
             activeArrows = state.activeArrows,
             gridWidth = state.levelData.gridWidth,
             gridHeight = state.levelData.gridHeight
         )
 
-        if (hintArrow != null) {
+        if (advisorHint != null) {
             soundManager.playHint()
             val newHints = maxOf(0, _uiState.value.hintsRemaining - 1)
             prefs.edit().putInt("hints_count", newHints).apply()
 
             _uiState.update {
                 it.copy(
-                    hintArrowId = hintArrow.id,
+                    hintArrowId = advisorHint.recommendedArrowId,
+                    activeStrategicHint = advisorHint,
                     hintsRemaining = newHints
                 )
             }
 
             hintResetJob?.cancel()
             hintResetJob = viewModelScope.launch {
-                delay(6000)
-                _uiState.update { it.copy(hintArrowId = null) }
+                delay(8000)
+                _uiState.update { it.copy(hintArrowId = null, activeStrategicHint = null) }
+            }
+        } else {
+            val hintArrow = PuzzleSolver.getHintArrow(
+                activeArrows = state.activeArrows,
+                gridWidth = state.levelData.gridWidth,
+                gridHeight = state.levelData.gridHeight
+            )
+            if (hintArrow != null) {
+                soundManager.playHint()
+                val newHints = maxOf(0, _uiState.value.hintsRemaining - 1)
+                prefs.edit().putInt("hints_count", newHints).apply()
+
+                _uiState.update {
+                    it.copy(
+                        hintArrowId = hintArrow.id,
+                        hintsRemaining = newHints
+                    )
+                }
+
+                hintResetJob?.cancel()
+                hintResetJob = viewModelScope.launch {
+                    delay(6000)
+                    _uiState.update { it.copy(hintArrowId = null) }
+                }
             }
         }
     }

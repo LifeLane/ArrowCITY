@@ -1,0 +1,10 @@
+=== Generator Efficiency ===
+Target Depth: 2
+Total Attempts: 409
+Time (ms): 6397
+Rejections:
+ - SKELETON_FAILED: 371
+ - STATE_EXPLOSION: 5
+ - DEPTH_TOO_LOW: 17
+ - UNSOLVABLE: 15
+============================

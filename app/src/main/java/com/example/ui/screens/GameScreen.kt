@@ -18,6 +18,8 @@ import androidx.compose.ui.platform.testTag
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.ui.components.AboutInfoDialog
 import com.example.ui.components.AmazeGameBoard
+import com.example.ui.components.BrainTeaserLabDialog
+import com.example.ui.components.CognitiveAnalyticsDialog
 import com.example.ui.components.CosmeticStoreDialog
 import com.example.ui.components.DailyChallengeDialog
 import com.example.ui.components.GameBottomBar
@@ -73,6 +75,9 @@ fun GameScreen(
             onOpenSpaceCityMap = {
                 viewModel.openSpaceCityMap(true)
             },
+            onOpenBrainTeaserLab = {
+                viewModel.openBrainTeaserLab(true)
+            },
             onOpenLevelSelect = {
                 viewModel.openLevelSelect(true)
             },
@@ -122,10 +127,14 @@ fun GameScreen(
                     maxDrops = uiState.maxDrops,
                     sessionSeconds = uiState.sessionSeconds,
                     theme = theme,
+                    cognitiveProfile = uiState.cognitiveProfile,
+                    isInspectorActive = uiState.isInspectorModeActive,
                     onBackClicked = { viewModel.requestExit() },
                     onResetClicked = { viewModel.requestReset() },
                     onThemeClicked = { viewModel.openThemeSelect(true) },
-                    onSettingsClicked = { viewModel.openSettings(true) }
+                    onSettingsClicked = { viewModel.openSettings(true) },
+                    onToggleInspector = { viewModel.toggleInspectorMode() },
+                    onOpenCognitiveSheet = { viewModel.openCognitiveSheet(true) }
                 )
 
                 // Central Game Board Area
@@ -148,8 +157,15 @@ fun GameScreen(
                     theme = theme,
                     powerUpsRemaining = uiState.powerUpsRemaining,
                     activePowerUp = uiState.activePowerUp,
+                    strategicHint = uiState.activeStrategicHint,
+                    undoAvailableCount = uiState.moveHistory.size,
+                    isAutoSolveRunning = uiState.isAutoSolveRunning,
                     onGridClicked = { viewModel.openLevelSelect(true) },
                     onHintClicked = { viewModel.useHint() },
+                    onUndoClicked = { viewModel.undoLastMove() },
+                    onStepSolve = { viewModel.stepAutoSolve() },
+                    onToggleAutoSolve = { viewModel.toggleAutoSolve() },
+                    onDismissStrategicHint = { viewModel.dismissStrategicHint() },
                     onPowerUpClicked = { powerUp -> viewModel.onPowerUpSelected(powerUp) }
                 )
             }
@@ -301,6 +317,29 @@ fun GameScreen(
             theme = theme,
             onConfirm = { viewModel.confirmReset() },
             onDismiss = { viewModel.openResetConfirm(false) }
+        )
+    }
+
+    if (uiState.isCognitiveSheetOpen && uiState.cognitiveProfile != null) {
+        CognitiveAnalyticsDialog(
+            profile = uiState.cognitiveProfile!!,
+            theme = theme,
+            isInspectorActive = uiState.isInspectorModeActive,
+            isAutoSolveActive = uiState.isAutoSolveRunning,
+            onToggleInspector = { viewModel.toggleInspectorMode() },
+            onStepSolve = { viewModel.stepAutoSolve() },
+            onAutoSolve = { viewModel.toggleAutoSolve() },
+            onDismiss = { viewModel.openCognitiveSheet(false) }
+        )
+    }
+
+    if (uiState.isBrainTeaserLabOpen) {
+        BrainTeaserLabDialog(
+            theme = theme,
+            onGenerateAndPlay = { diff, seed ->
+                viewModel.generateAndPlayBrainTeaser(diff, seed)
+            },
+            onDismiss = { viewModel.openBrainTeaserLab(false) }
         )
     }
 }

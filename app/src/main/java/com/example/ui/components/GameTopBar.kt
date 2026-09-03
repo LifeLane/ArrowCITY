@@ -11,6 +11,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -59,6 +60,10 @@ fun GameTopBar(
     maxDrops: Int,
     sessionSeconds: Long,
     theme: GameTheme,
+    cognitiveProfile: com.example.model.CognitiveProfile? = null,
+    isInspectorActive: Boolean = false,
+    onToggleInspector: () -> Unit = {},
+    onOpenCognitiveSheet: () -> Unit = {},
     onBackClicked: () -> Unit,
     onResetClicked: () -> Unit = {},
     onThemeClicked: () -> Unit,
@@ -127,37 +132,86 @@ fun GameTopBar(
                     modifier = Modifier.testTag("level_title_text")
                 )
 
-                // Discreet Zen session flow timer
-                Surface(
-                    shape = RoundedCornerShape(10.dp),
-                    color = theme.boardBackground.copy(alpha = 0.55f),
-                    modifier = Modifier
-                        .padding(top = 2.dp)
-                        .testTag("zen_session_timer")
+                // Discreet Zen session flow timer & Cognitive IQ badge
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = theme.boardBackground.copy(alpha = 0.55f),
+                        modifier = Modifier
+                            .padding(top = 2.dp)
+                            .testTag("zen_session_timer")
                     ) {
-                        Icon(
-                            imageVector = Icons.Outlined.SelfImprovement,
-                            contentDescription = "Mindful Flow Time",
-                            tint = theme.textSecondary.copy(alpha = 0.75f),
-                            modifier = Modifier.size(12.dp)
-                        )
-                        Text(
-                            text = formatSessionDuration(sessionSeconds),
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = theme.textSecondary.copy(alpha = 0.85f),
-                            letterSpacing = 0.4.sp
-                        )
+                        Row(
+                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.SelfImprovement,
+                                contentDescription = "Mindful Flow Time",
+                                tint = theme.textSecondary.copy(alpha = 0.75f),
+                                modifier = Modifier.size(12.dp)
+                            )
+                            Text(
+                                text = formatSessionDuration(sessionSeconds),
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = theme.textSecondary.copy(alpha = 0.85f),
+                                letterSpacing = 0.4.sp
+                            )
+                        }
+                    }
+
+                    if (cognitiveProfile != null) {
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = theme.headerGold.copy(alpha = 0.18f),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, theme.headerGold.copy(alpha = 0.5f)),
+                            modifier = Modifier
+                                .padding(top = 2.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .clickable { onOpenCognitiveSheet() }
+                                .testTag("cognitive_iq_top_badge")
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Text(
+                                    text = "🧠 IQ ${cognitiveProfile.puzzleIQ}",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = theme.headerGold
+                                )
+                            }
+                        }
                     }
                 }
             }
 
             Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(
+                    onClick = onToggleInspector,
+                    modifier = Modifier.testTag("inspector_radar_button")
+                ) {
+                    Surface(
+                        shape = CircleShape,
+                        color = if (isInspectorActive) Color(0xFF0284C7).copy(alpha = 0.25f) else Color.Transparent,
+                        modifier = Modifier.size(34.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Text(
+                                text = if (isInspectorActive) "🎯" else "👁️",
+                                fontSize = 16.sp
+                            )
+                        }
+                    }
+                }
+
                 IconButton(
                     onClick = onThemeClicked,
                     modifier = Modifier.testTag("theme_selector_button")

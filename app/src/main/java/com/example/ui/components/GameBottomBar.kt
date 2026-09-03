@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.outlined.GridView
 import androidx.compose.material.icons.outlined.Lightbulb
 import androidx.compose.material3.Icon
@@ -42,9 +43,18 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.material.icons.outlined.FastForward
+import androidx.compose.material.icons.outlined.Pause
+import androidx.compose.material.icons.outlined.PlayArrow
+import androidx.compose.material.icons.outlined.Psychology
+import androidx.compose.material.icons.outlined.Undo
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.IconButton
 import androidx.compose.ui.unit.sp
 import com.example.model.GameTheme
 import com.example.model.PowerUpType
+import com.example.model.StrategicHint
 
 @Composable
 fun GameBottomBar(
@@ -53,8 +63,15 @@ fun GameBottomBar(
     theme: GameTheme,
     powerUpsRemaining: Map<PowerUpType, Int>,
     activePowerUp: PowerUpType?,
+    strategicHint: StrategicHint? = null,
+    undoAvailableCount: Int = 0,
+    isAutoSolveRunning: Boolean = false,
     onGridClicked: () -> Unit,
     onHintClicked: () -> Unit,
+    onUndoClicked: () -> Unit = {},
+    onStepSolve: () -> Unit = {},
+    onToggleAutoSolve: () -> Unit = {},
+    onDismissStrategicHint: () -> Unit = {},
     onPowerUpClicked: (PowerUpType) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -64,6 +81,63 @@ fun GameBottomBar(
         modifier = modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        // Strategic Advisor Bubble (if active)
+        AnimatedVisibility(
+            visible = strategicHint != null,
+            enter = fadeIn() + scaleIn(),
+            exit = fadeOut() + scaleOut()
+        ) {
+            if (strategicHint != null) {
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = theme.cardBg.copy(alpha = 0.98f),
+                    border = androidx.compose.foundation.BorderStroke(1.5.dp, theme.headerGold),
+                    shadowElevation = 8.dp,
+                    modifier = Modifier
+                        .fillMaxWidth(0.92f)
+                        .padding(bottom = 10.dp)
+                        .testTag("strategic_advisor_card")
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Text(
+                            text = if (strategicHint.isChokepoint) "🎯" else "💡",
+                            fontSize = 24.sp
+                        )
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = strategicHint.title.uppercase(),
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = theme.headerGold,
+                                letterSpacing = 1.sp
+                            )
+                            Text(
+                                text = strategicHint.explanation,
+                                fontSize = 12.sp,
+                                color = theme.textPrimary,
+                                lineHeight = 16.sp
+                            )
+                        }
+                        IconButton(
+                            onClick = onDismissStrategicHint,
+                            modifier = Modifier.size(28.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Dismiss Hint",
+                                tint = theme.textSecondary,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
         // Power-Ups Bar
         AnimatedVisibility(
             visible = showPowerUpsRow,
@@ -72,14 +146,14 @@ fun GameBottomBar(
         ) {
             Row(
                 modifier = Modifier
-                    .padding(bottom = 12.dp)
+                    .padding(bottom = 10.dp)
                     .shadow(6.dp, RoundedCornerShape(24.dp))
                     .clip(RoundedCornerShape(24.dp))
                     .background(theme.cardBg.copy(alpha = 0.95f))
                     .border(1.dp, theme.bannerBorder, RoundedCornerShape(24.dp))
                     .padding(horizontal = 14.dp, vertical = 6.dp)
                     .testTag("powerups_bar"),
-                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 PowerUpButton(
@@ -113,19 +187,19 @@ fun GameBottomBar(
             }
         }
 
-        // Floating Action Buttons Row (Level Select & Hint)
+        // Floating Action Buttons Row (Level Select, Undo, Brain Solver, Hint)
         Row(
             modifier = Modifier
-                .padding(bottom = 14.dp)
+                .padding(bottom = 12.dp)
                 .testTag("bottom_action_buttons"),
-            horizontalArrangement = Arrangement.spacedBy(36.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             // Grid / Level Select Button
             Surface(
                 modifier = Modifier
-                    .size(64.dp)
-                    .shadow(elevation = 8.dp, shape = CircleShape)
+                    .size(56.dp)
+                    .shadow(elevation = 6.dp, shape = CircleShape)
                     .clip(CircleShape)
                     .clickable(onClick = onGridClicked)
                     .testTag("grid_button"),
@@ -134,25 +208,95 @@ fun GameBottomBar(
             ) {
                 Box(
                     contentAlignment = Alignment.Center,
-                    modifier = Modifier.size(64.dp)
+                    modifier = Modifier.size(56.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Outlined.GridView,
                         contentDescription = "Levels List",
                         tint = theme.arrowStroke,
-                        modifier = Modifier.size(30.dp)
+                        modifier = Modifier.size(26.dp)
+                    )
+                }
+            }
+
+            // Tactical Free Undo Button
+            Box(modifier = Modifier.size(56.dp)) {
+                Surface(
+                    modifier = Modifier
+                        .size(56.dp)
+                        .shadow(elevation = 6.dp, shape = CircleShape)
+                        .clip(CircleShape)
+                        .clickable(enabled = undoAvailableCount > 0, onClick = onUndoClicked)
+                        .testTag("tactical_undo_button"),
+                    color = if (undoAvailableCount > 0) theme.buttonBg else theme.buttonBg.copy(alpha = 0.5f),
+                    shape = CircleShape
+                ) {
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier.size(56.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Undo,
+                            contentDescription = "Undo Move",
+                            tint = if (undoAvailableCount > 0) theme.arrowStroke else theme.textSecondary.copy(alpha = 0.4f),
+                            modifier = Modifier.size(26.dp)
+                        )
+                    }
+                }
+
+                if (undoAvailableCount > 0) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .offset(x = 2.dp, y = (-2).dp)
+                            .size(20.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFF3B82F6))
+                            .border(1.dp, Color.White, CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = undoAvailableCount.toString(),
+                            color = Color.White,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+
+            // Brain Engine Step Solve / Auto-Play Button
+            Surface(
+                modifier = Modifier
+                    .size(56.dp)
+                    .shadow(elevation = 6.dp, shape = CircleShape)
+                    .clip(CircleShape)
+                    .clickable(onClick = onStepSolve)
+                    .testTag("brain_step_solve_button"),
+                color = if (isAutoSolveRunning) Color(0xFF10B981) else theme.buttonBg,
+                shape = CircleShape
+            ) {
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier.size(56.dp)
+                ) {
+                    Icon(
+                        imageVector = if (isAutoSolveRunning) Icons.Outlined.Pause else Icons.Outlined.FastForward,
+                        contentDescription = "Step Solve Deduction",
+                        tint = if (isAutoSolveRunning) Color.White else theme.headerGold,
+                        modifier = Modifier.size(28.dp)
                     )
                 }
             }
 
             // Lightbulb Hint Button
             Box(
-                modifier = Modifier.size(64.dp)
+                modifier = Modifier.size(56.dp)
             ) {
                 Surface(
                     modifier = Modifier
-                        .size(64.dp)
-                        .shadow(elevation = 8.dp, shape = CircleShape)
+                        .size(56.dp)
+                        .shadow(elevation = 6.dp, shape = CircleShape)
                         .clip(CircleShape)
                         .clickable(onClick = onHintClicked)
                         .testTag("hint_button"),
@@ -161,13 +305,13 @@ fun GameBottomBar(
                 ) {
                     Box(
                         contentAlignment = Alignment.Center,
-                        modifier = Modifier.size(64.dp)
+                        modifier = Modifier.size(56.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Outlined.Lightbulb,
                             contentDescription = "Get Hint",
                             tint = theme.arrowStroke,
-                            modifier = Modifier.size(32.dp)
+                            modifier = Modifier.size(28.dp)
                         )
                     }
                 }
@@ -178,16 +322,16 @@ fun GameBottomBar(
                         modifier = Modifier
                             .align(Alignment.TopEnd)
                             .offset(x = 2.dp, y = (-2).dp)
-                            .size(22.dp)
+                            .size(20.dp)
                             .clip(CircleShape)
                             .background(Color(0xFFEF4444))
-                            .border(1.5.dp, Color.White, CircleShape),
+                            .border(1.dp, Color.White, CircleShape),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
                             text = hintsRemaining.toString(),
                             color = Color.White,
-                            fontSize = 11.sp,
+                            fontSize = 10.sp,
                             fontWeight = FontWeight.Bold
                         )
                     }

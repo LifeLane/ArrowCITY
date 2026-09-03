@@ -19,6 +19,13 @@ enum class Direction(val dx: Int, val dy: Int, val angleDegrees: Float) {
             }
         }
     }
+
+    fun opposite(): Direction = when (this) {
+        UP -> DOWN
+        DOWN -> UP
+        LEFT -> RIGHT
+        RIGHT -> LEFT
+    }
 }
 
 data class GridPoint(val x: Int, val y: Int) {
@@ -232,4 +239,47 @@ enum class BackgroundAnimType(
     DEEP_OCEAN_RAYS("deep_ocean_rays", "Abyssal Caustics", "🌊", "Rising underwater air bubbles & sun rays"),
     MOLTEN_CINDERS("molten_cinders", "Molten Cinders", "🌋", "Rising glowing lava ember sparks and geothermal heat")
 }
+
+enum class BrainTeaserDifficulty(
+    val title: String,
+    val subtitle: String,
+    val targetArrows: Int,
+    val gridWidth: Int,
+    val gridHeight: Int,
+    val icon: String
+) {
+    CASUAL("Casual Warmup", "5×5 • Gentle Branching", 6, 5, 5, "🌱"),
+    TACTICAL("Tactical Flow", "6×6 • Dual Corridors", 10, 6, 6, "⚡"),
+    STRATEGIST("Strategic Core", "7×7 • Critical Chokepoints", 14, 7, 7, "🧠"),
+    GRANDMASTER("Grandmaster", "8×8 • Intertwined Chains", 18, 8, 8, "👑"),
+    COSMIC_MENSA("Cosmic Mensa", "9×9 • Mind-Bending Labyrinth", 22, 9, 9, "🌌")
+}
+
+data class CognitiveProfile(
+    val puzzleIQ: Int,
+    val complexityTier: String,
+    val criticalPathLength: Int,
+    val branchingFactor: Float,
+    val decisionStatesCount: Int,
+    val chokepoints: List<Int>,
+    val totalSolutionMoves: Int,
+    val analyticalSummary: String
+)
+
+data class StrategicHint(
+    val recommendedArrowId: Int,
+    val title: String,
+    val explanation: String,
+    val unlockedAfterIds: List<Int>,
+    val isChokepoint: Boolean
+)
+
+data class RaycastTrajectory(
+    val arrowId: Int,
+    val start: GridPoint,
+    val endPoint: GridPoint,
+    val isBlocked: Boolean,
+    val blockingArrowId: Int?
+)
+
 

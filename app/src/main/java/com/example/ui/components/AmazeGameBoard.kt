@@ -273,6 +273,27 @@ fun AmazeGameBoard(
                 }
             }
 
+            // Real-Time Tactical Raycast Laser Trajectories (Brain Teaser Engine)
+            if (uiState.isInspectorModeActive) {
+                activeArrows.forEach { arrow ->
+                    val trajectory = com.example.engine.BrainTeaserEngine.computeRaycastTrajectory(
+                        arrow = arrow,
+                        activeArrows = activeArrows,
+                        gridWidth = levelData.gridWidth,
+                        gridHeight = levelData.gridHeight
+                    )
+                    drawTacticalRaycastLaser(
+                        trajectory = trajectory,
+                        originX = originX,
+                        originY = originY,
+                        cellSize = cellSize,
+                        dashPhase = dashPhase,
+                        pulseAlpha = pulseAlpha,
+                        theme = theme
+                    )
+                }
+            }
+
             // Draw all active arrows with soft drop shadow, entrance slide, custom skin & state styling
             activeArrows.forEachIndexed { index, arrow ->
                 val isHinted = arrow.id == hintArrowId
@@ -1400,6 +1421,73 @@ private fun DrawScope.drawEnhancedGuidance(
 }
 
 /**
+ * Renders real-time tactical raycast laser trajectories computed by the BrainTeaserEngine.
+ */
+private fun DrawScope.drawTacticalRaycastLaser(
+    trajectory: com.example.model.RaycastTrajectory,
+    originX: Float,
+    originY: Float,
+    cellSize: Float,
+    dashPhase: Float,
+    pulseAlpha: Float,
+    theme: GameTheme
+) {
+    val startPt = trajectory.start
+    val endPt = trajectory.endPoint
+
+    val startX = originX + startPt.x * cellSize + cellSize / 2f
+    val startY = originY + startPt.y * cellSize + cellSize / 2f
+    val endX = originX + endPt.x * cellSize + cellSize / 2f
+    val endY = originY + endPt.y * cellSize + cellSize / 2f
+
+    val isBlocked = trajectory.isBlocked
+    val laserColor = if (isBlocked) {
+        Color(0xFFEF4444).copy(alpha = 0.75f * pulseAlpha)
+    } else {
+        Color(0xFF10B981).copy(alpha = 0.70f + 0.20f * pulseAlpha)
+    }
+
+    val dashInterval = if (isBlocked) floatArrayOf(8f, 8f) else floatArrayOf(14f, 8f)
+    val dashedEffect = PathEffect.dashPathEffect(dashInterval, dashPhase)
+
+    // Draw main laser beam
+    drawLine(
+        color = laserColor,
+        start = Offset(startX, startY),
+        end = Offset(endX, endY),
+        strokeWidth = if (isBlocked) 2.4f else 3.0f,
+        pathEffect = dashedEffect,
+        cap = StrokeCap.Round
+    )
+
+    // Draw end marker
+    if (isBlocked) {
+        drawCircle(
+            color = Color(0xFFEF4444),
+            radius = cellSize * 0.20f,
+            center = Offset(endX, endY),
+            style = Stroke(width = 1.8f)
+        )
+        drawCircle(
+            color = Color(0xFFEF4444).copy(alpha = 0.45f),
+            radius = cellSize * 0.10f,
+            center = Offset(endX, endY)
+        )
+    } else {
+        drawCircle(
+            color = Color(0xFF10B981).copy(alpha = 0.35f * pulseAlpha),
+            radius = cellSize * 0.28f,
+            center = Offset(endX, endY)
+        )
+        drawCircle(
+            color = Color.White.copy(alpha = 0.85f),
+            radius = cellSize * 0.08f,
+            center = Offset(endX, endY)
+        )
+    }
+}
+
+/**
  * Hit testing: Checks if a tap coordinate touches any segment of an arrow.
  */
 private fun findTappedArrow(
@@ -1409,9 +1497,24 @@ private fun findTappedArrow(
     originY: Float,
     cellSize: Float
 ): ArrowItem? {
-    val hitTolerance = cellSize * 0.8f
+    val hitTolerance = cellSize * 0.85f
+    var bestArrow: ArrowItem? = null
+    var minDistance = Float.MAX_VALUE
 
     for (arrow in arrows) {
+        var arrowMinDist = Float.MAX_VALUE
+
+        // Check distance to all individual vertex points (tail, corners, head)
+        for (pt in arrow.points) {
+            val px = originX + pt.x * cellSize + cellSize / 2f
+            val py = originY + pt.y * cellSize + cellSize / 2f
+            val d = hypot(tapOffset.x - px, tapOffset.y - py)
+            if (d < arrowMinDist) {
+                arrowMinDist = d
+            }
+        }
+
+        // Check distance to arrow segments
         for (i in 0 until arrow.points.size - 1) {
             val p1 = arrow.points[i]
             val p2 = arrow.points[i + 1]
@@ -1422,12 +1525,17 @@ private fun findTappedArrow(
             val by = originY + p2.y * cellSize + cellSize / 2f
 
             val dist = distanceToSegment(tapOffset.x, tapOffset.y, ax, ay, bx, by)
-            if (dist <= hitTolerance) {
-                return arrow
+            if (dist < arrowMinDist) {
+                arrowMinDist = dist
             }
         }
+
+        if (arrowMinDist <= hitTolerance && arrowMinDist < minDistance) {
+            minDistance = arrowMinDist
+            bestArrow = arrow
+        }
     }
-    return null
+    return bestArrow
 }
 
 private fun distanceToSegment(

@@ -19,22 +19,15 @@ object ProceduralGenerator {
         val width = city.gridWidthRange.first + ((city.gridWidthRange.last - city.gridWidthRange.first) * progress).toInt()
         val height = city.gridHeightRange.first + ((city.gridHeightRange.last - city.gridHeightRange.first) * progress).toInt()
 
-        val blueprint = StrategicBlueprint.forLevel(levelNumber)
-        val generator = BlueprintGenerator(width, height)
-        
-        var arrows = try {
-            val candidateState = generator.generate(seed, blueprint)
-            candidateState.arrows.values.toList().mapIndexed { index, arrow ->
-                arrow.copy(id = index + 1, colorIndex = index % 4)
-            }
-        } catch (e: Exception) {
-            android.util.Log.e("ProceduralGenerator", "Generation failure for Level $levelNumber: ${e.message}")
-            CuratedLevels.curatedMap[1]?.arrows ?: emptyList()
-        }
-        
-        if (arrows.isEmpty()) {
-            arrows = CuratedLevels.curatedMap[1]?.arrows ?: emptyList()
-        }
+        val targetArrowCount = (7 + city.id + (routeInCity * 0.75f).toInt()).coerceIn(6, 26)
+        val generated = ReversePuzzleGenerator.generate(
+            gridWidth = width,
+            gridHeight = height,
+            targetArrowCount = targetArrowCount,
+            seed = seed,
+            maxInitialUnblocked = if (routeInCity > 12) 3 else 2
+        )
+        val arrows = generated.arrows
 
         val levelTitle = generateRouteTitle(city, routeInCity, levelNumber)
         val bannerText = generateBannerText(city, routeInCity)
